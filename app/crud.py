@@ -271,6 +271,39 @@ def create_link(
     return link
 
 
+def list_turns_for_conversation(db: Session, conversation_id: int) -> list[Turn]:
+    stmt = (
+        select(Turn)
+        .where(Turn.conversation_id == conversation_id)
+        .order_by(Turn.timestamp.asc(), Turn.id.asc())
+    )
+    return db.scalars(stmt).all()
+
+
+def get_latest_response_id(db: Session, conversation_id: int) -> str | None:
+    stmt = (
+        select(Turn.response_id)
+        .where(
+            Turn.conversation_id == conversation_id,
+            Turn.role == "assistant",
+            Turn.response_id.isnot(None),
+        )
+        .order_by(Turn.timestamp.desc(), Turn.id.desc())
+        .limit(1)
+    )
+    return db.scalar(stmt)
+
+
+def get_initial_system_turn(db: Session, conversation_id: int) -> Turn | None:
+    stmt = (
+        select(Turn)
+        .where(Turn.conversation_id == conversation_id, Turn.role == "system")
+        .order_by(Turn.timestamp.asc(), Turn.id.asc())
+        .limit(1)
+    )
+    return db.scalar(stmt)
+
+
 def search_turns(db: Session, query: str) -> list[dict]:
     sql = (
         "SELECT turn_id, content_text, conversation_id, project_id "

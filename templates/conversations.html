@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <div class="split">
+    <div>
+      <h2>Conversations</h2>
+      <p class="muted">Start a new OpenAI conversation or revisit existing ones.</p>
+    </div>
+    <div class="row-actions">
+      <a href="/p/{{ project.slug }}/dashboard">Back to dashboard</a>
+    </div>
+  </div>
+  <form method="post" action="/p/{{ project.slug }}/conversations" class="form-grid">
+    <label>
+      Title
+      <input type="text" name="title" required />
+    </label>
+    <label>
+      Initial system instruction (optional)
+      <textarea name="system_instruction" rows="3"></textarea>
+    </label>
+    <button type="submit">Create conversation</button>
+  </form>
+</section>
+
+<section class="card">
+  <h3>Existing Conversations</h3>
+  {% if conversations %}
+    <ul class="list">
+      {% for conversation in conversations %}
+        <li class="list-item">
+          <div>
+            <strong>{{ conversation.title }}</strong>
+            <p class="muted">Source: {{ conversation.source }} · Turns: {{ conversation.turns | length }}</p>
+          </div>
+          <a href="/p/{{ project.slug }}/conversations/{{ conversation.id }}">Open chat</a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="muted">No conversations yet. Create one to get started.</p>
+  {% endif %}
+</section>
+{% endblock %}

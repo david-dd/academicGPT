@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session
 
 from app import crud
 from app.db import get_db
+from openai import APIStatusError, AuthenticationError, OpenAIError, RateLimitError
+
 from app.models import Conversation, Link, Project, TextBlock
 from app.openai_client import get_openai_client
 from app.security import EncryptionError, decrypt_secret, encrypt_secret
@@ -37,6 +39,55 @@ def get_block_or_404(db: Session, project: Project, block_id: int) -> TextBlock:
     if not block or block.project_id != project.id:
         raise HTTPException(status_code=404, detail="Text block not found")
     return block
+
+
+def get_conversation_or_404(
+    db: Session, project: Project, conversation_id: int
+) -> Conversation:
+    conversation = db.get(Conversation, conversation_id)
+    if not conversation or conversation.project_id != project.id:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return conversation
+
+
+def get_project_openai_key(project: Project) -> str:
+    secret = next((s for s in project.secrets if s.secret_type == "openai_api_key"), None)
+    if not secret:
+        raise HTTPException(status_code=400, detail="Project API key not configured")
+    try:
+        return decrypt_secret(secret.secret_ciphertext)
+    except EncryptionError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+def serialize_usage(usage) -> dict | None:
+    if usage is None:
+        return None
+    if hasattr(usage, "model_dump"):
+        return usage.model_dump()
+    if hasattr(usage, "dict"):
+        return usage.dict()
+    return dict(usage)
+
+
+def render_conversation_detail(
+    request: Request,
+    project: Project,
+    conversation: Conversation,
+    db: Session,
+    error: str | None = None,
+):
+    turns = crud.list_turns_for_conversation(db, conversation_id=conversation.id)
+    return templates.TemplateResponse(
+        "conversation_detail.html",
+        {
+            "request": request,
+            "project": project,
+            "conversation": conversation,
+            "turns": turns,
+            "error": error,
+        },
+    )
 
 
 def filter_links(
@@ -123,6 +174,46 @@ def project_dashboard(project_slug: str, request: Request, db: Session = Depends
             "stats": stats,
             "has_key": has_key,
         },
+    )
+
+
+@app.get("/p/{project_slug}/conversations", response_class=HTMLResponse)
+def list_conversations(
+    project_slug: str, request: Request, db: Session = Depends(get_db)
+):
+    project = get_project_by_slug_or_404(db, project_slug)
+    return templates.TemplateResponse(
+        "conversations.html",
+        {
+            "request": request,
+            "project": project,
+            "conversations": project.conversations,
+        },
+    )
+
+
+@app.post("/p/{project_slug}/conversations")
+def create_project_conversation(
+    project_slug: str,
+    title: str = Form(...),
+    system_instruction: str | None = Form(None),
+    db: Session = Depends(get_db),
+):
+    project = get_project_by_slug_or_404(db, project_slug)
+    conversation = crud.create_conversation(
+        db, project=project, title=title, source="openai", external_id=None
+    )
+    if system_instruction and system_instruction.strip():
+        crud.create_turn(
+            db,
+            conversation=conversation,
+            role="system",
+            content_text=system_instruction,
+            model="system",
+            timestamp=datetime.utcnow(),
+        )
+    return RedirectResponse(
+        url=f"/p/{project.slug}/conversations/{conversation.id}", status_code=303
     )
 
 
@@ -381,59 +472,125 @@ def create_conversation(
     return RedirectResponse(url=f"/p/{project.slug}/dashboard", status_code=303)
 
 
-@app.post("/p/{project_slug}/conversations/{conversation_id}/turns")
-def create_turn(
+@app.get("/p/{project_slug}/conversations/{conversation_id}", response_class=HTMLResponse)
+def conversation_detail(
     project_slug: str,
     conversation_id: int,
-    prompt: str = Form(...),
-    response: str | None = Form(None),
-    use_openai: bool | None = Form(False),
+    request: Request,
     db: Session = Depends(get_db),
 ):
     project = get_project_by_slug_or_404(db, project_slug)
-    conversation = db.get(Conversation, conversation_id)
-    if not conversation or conversation.project_id != project.id:
-        raise HTTPException(status_code=404, detail="Conversation not found")
+    conversation = get_conversation_or_404(db, project, conversation_id)
+    return render_conversation_detail(request, project, conversation, db)
 
-    resolved_response = response or ""
-    response_id: str | None = None
 
-    if use_openai:
-        secret = next(
-            (s for s in project.secrets if s.secret_type == "openai_api_key"), None
+@app.post("/p/{project_slug}/conversations/{conversation_id}/messages")
+def create_conversation_message(
+    project_slug: str,
+    conversation_id: int,
+    request: Request,
+    message: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    project = get_project_by_slug_or_404(db, project_slug)
+    conversation = get_conversation_or_404(db, project, conversation_id)
+    if not message.strip():
+        return render_conversation_detail(
+            request,
+            project,
+            conversation,
+            db,
+            error="Message cannot be empty.",
         )
-        if not secret:
-            raise HTTPException(status_code=400, detail="Project API key not configured")
-        try:
-            api_key = decrypt_secret(secret.secret_ciphertext)
-        except EncryptionError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-        client = get_openai_client(api_key)
+
+    try:
+        api_key = get_project_openai_key(project)
+    except HTTPException as exc:
+        return render_conversation_detail(
+            request,
+            project,
+            conversation,
+            db,
+            error=str(exc.detail),
+        )
+    client = get_openai_client(api_key)
+    previous_response_id = crud.get_latest_response_id(db, conversation_id=conversation.id)
+    system_turn = crud.get_initial_system_turn(db, conversation_id=conversation.id)
+    input_messages = []
+    if not previous_response_id and system_turn:
+        input_messages.append({"role": "system", "content": system_turn.content_text})
+    input_messages.append({"role": "user", "content": message})
+
+    # We use previous_response_id to keep conversation state on the OpenAI side.
+    try:
         api_response = client.responses.create(
             model="gpt-4o-mini",
-            input=prompt,
+            input=input_messages,
+            previous_response_id=previous_response_id,
         )
-        resolved_response = api_response.output_text
-        response_id = api_response.id
+    except RateLimitError:
+        return render_conversation_detail(
+            request,
+            project,
+            conversation,
+            db,
+            error="Rate limit reached. Please wait and try again.",
+        )
+    except AuthenticationError:
+        return render_conversation_detail(
+            request,
+            project,
+            conversation,
+            db,
+            error="Authentication failed. Please check the project API key.",
+        )
+    except APIStatusError as exc:
+        return render_conversation_detail(
+            request,
+            project,
+            conversation,
+            db,
+            error=f"OpenAI error: {exc.message}",
+        )
+    except OpenAIError as exc:
+        return render_conversation_detail(
+            request,
+            project,
+            conversation,
+            db,
+            error=f"OpenAI error: {exc}",
+        )
 
     crud.create_turn(
         db,
         conversation=conversation,
         role="user",
-        content_text=prompt,
-        model="manual",
+        content_text=message,
+        model="user",
         timestamp=datetime.utcnow(),
+        metadata_json={"input": input_messages},
     )
+
+    metadata = {
+        "usage": serialize_usage(getattr(api_response, "usage", None)),
+        "previous_response_id": previous_response_id,
+        "status": getattr(api_response, "status", None),
+    }
+    response_id = getattr(api_response, "id", None)
+    model = getattr(api_response, "model", None) or "gpt-4o-mini"
     crud.create_turn(
         db,
         conversation=conversation,
         role="assistant",
-        content_text=resolved_response,
-        model="gpt-4o-mini" if use_openai else "manual",
+        content_text=api_response.output_text,
+        model=model,
         timestamp=datetime.utcnow(),
         response_id=response_id,
+        metadata_json=metadata,
     )
-    return RedirectResponse(url=f"/p/{project.slug}/dashboard", status_code=303)
+    return RedirectResponse(
+        url=f"/p/{project.slug}/conversations/{conversation.id}", status_code=303
+    )
 
 
 @app.get("/p/{project_slug}/search", response_class=HTMLResponse)

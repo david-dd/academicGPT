@@ -69,21 +69,9 @@
                 </div>
                 <span class="pill">{{ link.conversation.source }}</span>
               </div>
-              <form method="post" action="/p/{{ project.slug }}/conversations/{{ link.conversation.id }}/turns" class="form-grid">
-                <label>
-                  Prompt
-                  <textarea name="prompt" rows="3" required></textarea>
-                </label>
-                <label>
-                  Response (optional if using OpenAI)
-                  <textarea name="response" rows="3"></textarea>
-                </label>
-                <label class="checkbox">
-                  <input type="checkbox" name="use_openai" value="true">
-                  Use OpenAI (requires key)
-                </label>
-                <button type="submit">Add Turns</button>
-              </form>
+              <div class="row-actions">
+                <a href="/p/{{ project.slug }}/conversations/{{ link.conversation.id }}">Open chat</a>
+              </div>
             </div>
             {% endfor %}
           </div>
@@ -96,6 +84,12 @@
   {% else %}
     <p class="muted">No text blocks yet. Add one below.</p>
   {% endif %}
+</section>
+
+<section class="card">
+  <h3>Conversations</h3>
+  <p class="muted">Create or revisit conversations tied to this project.</p>
+  <a href="/p/{{ project.slug }}/conversations">Open conversations</a>
 </section>
 
 <section class="card">

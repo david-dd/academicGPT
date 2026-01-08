@@ -239,6 +239,51 @@ button:hover {
   margin-bottom: 0.5rem;
 }
 
+.chat-thread {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.chat-turn {
+  padding: 1rem;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.chat-turn-system {
+  background: #fff7ed;
+  border-color: #fed7aa;
+}
+
+.chat-turn-user {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.chat-turn-assistant {
+  background: #ecfdf3;
+  border-color: #bbf7d0;
+}
+
+.chat-meta {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.error {
+  background: #fee2e2;
+  color: #b91c1c;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  border: 1px solid #fecaca;
+}
+
 .checkbox {
   display: flex;
   gap: 0.5rem;
