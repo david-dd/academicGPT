@@ -19,6 +19,7 @@ and packaging the app. For a small MVP, it keeps commands consistent across dev 
 
 ```bash
 py -3.12 -m poetry install
+py -3.12 -m poetry run alembic upgrade head
 ```
 
 Set a master passphrase (required for encrypting project API keys) within the .env file:
