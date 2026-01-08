@@ -16,14 +16,14 @@
         <option value="all" {% if link_relation == "all" %}selected{% endif %}>Alle</option>
         {% for relation in relation_types %}
           <option value="{{ relation }}" {% if link_relation == relation %}selected{% endif %}>
-            {{ relation }}
+            {{ relation_labels[relation] }}
           </option>
         {% endfor %}
       </select>
     </label>
     <label class="grow">
       Suche
-      <input type="search" name="q" value="{{ link_query }}" placeholder="Konversationstitel">
+      <input type="search" name="q" value="{{ link_query }}" placeholder="Konversationstitel oder Turn-Inhalt">
     </label>
     <button type="submit">Filtern</button>
   </form>
@@ -56,7 +56,7 @@
       Relationstyp
       <select name="relation" required>
         {% for relation in relation_types %}
-          <option value="{{ relation }}">{{ relation }}</option>
+          <option value="{{ relation }}">{{ relation_labels[relation] }}</option>
         {% endfor %}
       </select>
     </label>
@@ -70,7 +70,7 @@
       <div class="list-item">
         <div>
           <strong>{{ link.conversation.title }}</strong>
-          <p class="muted">Relation: {{ link.relation }}</p>
+          <p class="muted">Relation: {{ relation_labels[link.relation] }}</p>
         </div>
         <form
           method="post"
@@ -83,7 +83,7 @@
           <select name="relation">
             {% for relation in relation_types %}
               <option value="{{ relation }}" {% if link.relation == relation %}selected{% endif %}>
-                {{ relation }}
+                {{ relation_labels[relation] }}
               </option>
             {% endfor %}
           </select>

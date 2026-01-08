@@ -21,6 +21,12 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 RELATION_TYPES = ["adopted", "supporting", "ideation", "rejected"]
+RELATION_LABELS = {
+    "adopted": "adopted",
+    "supporting": "supporting",
+    "ideation": "ideation (nicht übernommen)",
+    "rejected": "rejected",
+}
 
 
 def slugify(value: str) -> str:
@@ -86,20 +92,41 @@ def render_conversation_detail(
             "conversation": conversation,
             "turns": turns,
             "error": error,
+            "relation_types": RELATION_TYPES,
+            "relation_labels": RELATION_LABELS,
+            "project_blocks": project.text_blocks,
         },
     )
 
 
 def filter_links(
-    links: list[Link], relation: str | None = None, query: str | None = None
+    links: list[Link],
+    relation: str | None = None,
+    query: str | None = None,
+    db: Session | None = None,
+    project_id: int | None = None,
 ) -> list[Link]:
     filtered = links
     if relation and relation != "all":
         filtered = [link for link in filtered if link.relation == relation]
     if query:
         lowered = query.lower()
+        matched_conversation_ids = {
+            link.conversation.id
+            for link in filtered
+            if lowered in link.conversation.title.lower()
+        }
+        if db and project_id:
+            matches = crud.search_turns_for_project(
+                db, project_id=project_id, query=query
+            )
+            matched_conversation_ids.update(
+                row["conversation_id"] for row in matches
+            )
         filtered = [
-            link for link in filtered if lowered in link.conversation.title.lower()
+            link
+            for link in filtered
+            if link.conversation.id in matched_conversation_ids
         ]
     return filtered
 
@@ -173,6 +200,7 @@ def project_dashboard(project_slug: str, request: Request, db: Session = Depends
             "projects": projects,
             "stats": stats,
             "has_key": has_key,
+            "relation_labels": RELATION_LABELS,
         },
     )
 
@@ -259,7 +287,13 @@ def list_blocks(
     link_relation = "all"
     link_query = ""
     filtered_links = (
-        filter_links(selected_block.links, link_relation, link_query)
+        filter_links(
+            selected_block.links,
+            link_relation,
+            link_query,
+            db=db,
+            project_id=project.id,
+        )
         if selected_block
         else []
     )
@@ -276,6 +310,7 @@ def list_blocks(
             "link_relation": link_relation,
             "link_query": link_query,
             "relation_types": RELATION_TYPES,
+            "relation_labels": RELATION_LABELS,
             "project_conversations": project.conversations,
         },
     )
@@ -294,7 +329,13 @@ def block_detail(
     block = get_block_or_404(db, project, block_id)
     link_relation = relation or "all"
     link_query = q or ""
-    filtered_links = filter_links(block.links, link_relation, link_query)
+    filtered_links = filter_links(
+        block.links,
+        link_relation,
+        link_query,
+        db=db,
+        project_id=project.id,
+    )
     context = {
         "request": request,
         "project": project,
@@ -303,6 +344,7 @@ def block_detail(
         "link_relation": link_relation,
         "link_query": link_query,
         "relation_types": RELATION_TYPES,
+        "relation_labels": RELATION_LABELS,
         "project_conversations": project.conversations,
     }
     if request.headers.get("HX-Request"):
@@ -367,7 +409,13 @@ def block_links(
     block = get_block_or_404(db, project, block_id)
     link_relation = relation or "all"
     link_query = q or ""
-    filtered_links = filter_links(block.links, link_relation, link_query)
+    filtered_links = filter_links(
+        block.links,
+        link_relation,
+        link_query,
+        db=db,
+        project_id=project.id,
+    )
     context = {
         "request": request,
         "project": project,
@@ -376,6 +424,7 @@ def block_links(
         "link_relation": link_relation,
         "link_query": link_query,
         "relation_types": RELATION_TYPES,
+        "relation_labels": RELATION_LABELS,
         "project_conversations": project.conversations,
     }
     if request.headers.get("HX-Request"):
@@ -482,6 +531,47 @@ def conversation_detail(
     project = get_project_by_slug_or_404(db, project_slug)
     conversation = get_conversation_or_404(db, project, conversation_id)
     return render_conversation_detail(request, project, conversation, db)
+
+
+@app.post("/p/{project_slug}/conversations/{conversation_id}/links")
+def add_conversation_link(
+    project_slug: str,
+    conversation_id: int,
+    block_id: int = Form(...),
+    relation: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    project = get_project_by_slug_or_404(db, project_slug)
+    conversation = get_conversation_or_404(db, project, conversation_id)
+    block = get_block_or_404(db, project, block_id)
+    if relation not in RELATION_TYPES:
+        raise HTTPException(status_code=400, detail="Invalid relation type")
+    crud.create_link(db, text_block=block, conversation=conversation, relation=relation)
+    return RedirectResponse(
+        url=f"/p/{project.slug}/conversations/{conversation.id}", status_code=303
+    )
+
+
+@app.post("/p/{project_slug}/conversations/{conversation_id}/links/{link_id}")
+def update_conversation_link(
+    project_slug: str,
+    conversation_id: int,
+    link_id: int,
+    relation: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    project = get_project_by_slug_or_404(db, project_slug)
+    conversation = get_conversation_or_404(db, project, conversation_id)
+    link = db.get(Link, link_id)
+    if not link or link.conversation_id != conversation.id:
+        raise HTTPException(status_code=404, detail="Link not found")
+    if relation not in RELATION_TYPES:
+        raise HTTPException(status_code=400, detail="Invalid relation type")
+    link.relation = relation
+    db.commit()
+    return RedirectResponse(
+        url=f"/p/{project.slug}/conversations/{conversation.id}", status_code=303
+    )
 
 
 @app.post("/p/{project_slug}/conversations/{conversation_id}/messages")

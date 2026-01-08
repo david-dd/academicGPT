@@ -64,7 +64,7 @@
               <div class="split">
                 <div>
                   <strong>{{ link.conversation.title }}</strong>
-                  <span class="muted">({{ link.relation }})</span>
+                  <span class="muted">({{ relation_labels[link.relation] }})</span>
                   <p class="muted">Turns: {{ link.conversation.turns | length }}</p>
                 </div>
                 <span class="pill">{{ link.conversation.source }}</span>
