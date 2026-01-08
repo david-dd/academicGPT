@@ -9,9 +9,19 @@
   </head>
   <body>
     <header class="site-header">
-      <h1><a href="/">AI Logger</a></h1>
-      <nav>
-        <a href="/search?q=">Search</a>
+      <div class="brand">
+        <h1><a href="/">AI Logger</a></h1>
+        {% if project %}
+          <span class="project-pill">Project: {{ project.name }}</span>
+        {% endif %}
+      </div>
+      <nav class="site-nav">
+        <a href="/">Projects</a>
+        {% if project %}
+          <a href="/p/{{ project.slug }}/dashboard">Dashboard</a>
+          <a href="/p/{{ project.slug }}/settings">Settings</a>
+          <a href="/p/{{ project.slug }}/search?q=">Search</a>
+        {% endif %}
       </nav>
     </header>
     <main class="content">

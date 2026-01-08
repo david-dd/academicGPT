@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from app.models import (
@@ -27,12 +27,65 @@ def create_project(
     return project
 
 
-def get_project(db: Session, project_id: int) -> Project | None:
-    return db.get(Project, project_id)
+def get_project(db: Session, project_id: int, include_archived: bool = False) -> Project | None:
+    stmt = select(Project).where(Project.id == project_id)
+    if not include_archived:
+        stmt = stmt.where(Project.deleted_at.is_(None))
+    return db.scalar(stmt)
 
 
-def list_projects(db: Session) -> list[Project]:
-    return db.scalars(select(Project).order_by(Project.created_at.desc())).all()
+def get_project_by_slug(
+    db: Session, slug: str, include_archived: bool = False
+) -> Project | None:
+    stmt = select(Project).where(Project.slug == slug)
+    if not include_archived:
+        stmt = stmt.where(Project.deleted_at.is_(None))
+    return db.scalar(stmt)
+
+
+def list_projects(db: Session, include_archived: bool = False) -> list[Project]:
+    stmt = select(Project)
+    if not include_archived:
+        stmt = stmt.where(Project.deleted_at.is_(None))
+    return db.scalars(stmt.order_by(Project.created_at.desc())).all()
+
+
+def project_slug_exists(db: Session, slug: str) -> bool:
+    return db.scalar(select(func.count(Project.id)).where(Project.slug == slug)) > 0
+
+
+def project_name_exists(db: Session, name: str) -> bool:
+    return db.scalar(select(func.count(Project.id)).where(Project.name == name)) > 0
+
+
+def update_project(
+    db: Session,
+    project: Project,
+    name: str | None = None,
+    slug: str | None = None,
+    description: str | None = None,
+    settings_json: dict | None = None,
+) -> Project:
+    if name is not None:
+        project.name = name
+    if slug is not None:
+        project.slug = slug
+    if description is not None:
+        project.description = description
+    project.settings_json = settings_json
+    db.commit()
+    db.refresh(project)
+    return project
+
+
+def soft_delete_project(db: Session, project: Project) -> Project:
+    timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    project.deleted_at = datetime.utcnow()
+    project.name = f"{project.name} (archived {timestamp})"
+    project.slug = f"{project.slug}-archived-{timestamp}"
+    db.commit()
+    db.refresh(project)
+    return project
 
 
 def create_project_secret(
@@ -45,6 +98,20 @@ def create_project_secret(
     db.commit()
     db.refresh(secret)
     return secret
+
+
+def upsert_project_secret(
+    db: Session, project: Project, secret_type: str, secret_ciphertext: bytes
+) -> ProjectSecret:
+    secret = db.get(ProjectSecret, (project.id, secret_type))
+    if secret:
+        secret.secret_ciphertext = secret_ciphertext
+        db.commit()
+        db.refresh(secret)
+        return secret
+    return create_project_secret(
+        db, project=project, secret_type=secret_type, secret_ciphertext=secret_ciphertext
+    )
 
 
 def create_text_block(
@@ -171,6 +238,15 @@ def search_turns(db: Session, query: str) -> list[dict]:
     return list(rows)
 
 
+def search_turns_for_project(db: Session, project_id: int, query: str) -> list[dict]:
+    sql = (
+        "SELECT turn_id, content_text, conversation_id, project_id "
+        "FROM turns_fts WHERE turns_fts MATCH :query AND project_id = :project_id"
+    )
+    rows = db.execute(text(sql), {"query": query, "project_id": project_id}).mappings().all()
+    return list(rows)
+
+
 def search_text_blocks(db: Session, query: str) -> list[dict]:
     sql = (
         "SELECT text_block_id, title, notes, working_text, project_id "
@@ -201,3 +277,22 @@ def list_turns_for_project(db: Session, project_id: int) -> list[dict]:
         {"project_id": project_id},
     ).mappings().all()
     return list(rows)
+
+
+def get_project_stats(db: Session, project_id: int) -> dict:
+    text_blocks = db.scalar(
+        select(func.count(TextBlock.id)).where(TextBlock.project_id == project_id)
+    )
+    conversations = db.scalar(
+        select(func.count(Conversation.id)).where(Conversation.project_id == project_id)
+    )
+    turns = db.scalar(
+        select(func.count(Turn.id))
+        .join(Conversation, Conversation.id == Turn.conversation_id)
+        .where(Conversation.project_id == project_id)
+    )
+    return {
+        "text_blocks": text_blocks or 0,
+        "conversations": conversations or 0,
+        "turns": turns or 0,
+    }

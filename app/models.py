@@ -21,6 +21,7 @@ class Project(Base):
     settings_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, onupdate=utc_now)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     secrets: Mapped[list["ProjectSecret"]] = relationship(
         back_populates="project", cascade="all, delete-orphan"

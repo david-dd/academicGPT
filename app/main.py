@@ -23,27 +23,58 @@ def slugify(value: str) -> str:
     return "-".join(value.lower().strip().split())
 
 
+def get_project_by_slug_or_404(db: Session, project_slug: str):
+    project = crud.get_project_by_slug(db, project_slug)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return project
+
+
+def build_unique_slug(db: Session, name: str) -> str:
+    base_slug = slugify(name)
+    slug = base_slug
+    counter = 2
+    while crud.project_slug_exists(db, slug):
+        slug = f"{base_slug}-{counter}"
+        counter += 1
+    return slug
+
+
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request, db: Session = Depends(get_db)):
     projects = crud.list_projects(db)
-    return templates.TemplateResponse("index.html", {"request": request, "projects": projects})
+    return templates.TemplateResponse(
+        "index.html",
+        {"request": request, "projects": projects, "error": None},
+    )
 
 
 @app.post("/projects")
 def create_project(
+    request: Request,
     name: str = Form(...),
     description: str | None = Form(None),
     api_key: str | None = Form(None),
     db: Session = Depends(get_db),
 ):
+    if crud.project_name_exists(db, name):
+        projects = crud.list_projects(db)
+        return templates.TemplateResponse(
+            "index.html",
+            {
+                "request": request,
+                "projects": projects,
+                "error": "Project name already exists.",
+            },
+            status_code=400,
+        )
     try:
         api_key_encrypted = encrypt_secret(api_key) if api_key else None
     except EncryptionError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    project = crud.create_project(
-        db, name=name, slug=slugify(name), description=description, settings_json=None
-    )
+    slug = build_unique_slug(db, name)
+    project = crud.create_project(db, name=name, slug=slug, description=description, settings_json=None)
     if api_key_encrypted:
         crud.create_project_secret(
             db,
@@ -51,71 +82,80 @@ def create_project(
             secret_type="openai_api_key",
             secret_ciphertext=api_key_encrypted,
         )
-    return RedirectResponse(url=f"/projects/{project.id}", status_code=303)
+    return RedirectResponse(url=f"/p/{project.slug}/dashboard", status_code=303)
 
 
-@app.get("/projects/{project_id}", response_class=HTMLResponse)
-def project_detail(project_id: int, request: Request, db: Session = Depends(get_db)):
-    project = crud.get_project(db, project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+@app.get("/p/{project_slug}/dashboard", response_class=HTMLResponse)
+def project_dashboard(project_slug: str, request: Request, db: Session = Depends(get_db)):
+    project = get_project_by_slug_or_404(db, project_slug)
+    stats = crud.get_project_stats(db, project_id=project.id)
+    has_key = any(secret.secret_type == "openai_api_key" for secret in project.secrets)
+    projects = crud.list_projects(db)
     return templates.TemplateResponse(
-        "project.html", {"request": request, "project": project}
+        "project_dashboard.html",
+        {
+            "request": request,
+            "project": project,
+            "projects": projects,
+            "stats": stats,
+            "has_key": has_key,
+        },
     )
 
 
-@app.post("/projects/{project_id}/blocks")
+@app.post("/p/{project_slug}/blocks")
 def create_block(
-    project_id: int,
+    project_slug: str,
     title: str = Form(...),
     notes: str | None = Form(None),
     db: Session = Depends(get_db),
 ):
-    project = crud.get_project(db, project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    project = get_project_by_slug_or_404(db, project_slug)
     crud.create_text_block(
         db,
         project=project,
-        tb_id=f"TB-{project_id}-{title[:3].upper()}",
+        tb_id=f"TB-{project.id}-{title[:3].upper()}",
         title=title,
         block_type="draft",
         status="active",
         notes=notes,
         working_text=None,
     )
-    return RedirectResponse(url=f"/projects/{project_id}", status_code=303)
+    return RedirectResponse(url=f"/p/{project.slug}/dashboard", status_code=303)
 
 
-@app.post("/blocks/{block_id}/conversations")
+@app.post("/p/{project_slug}/blocks/{block_id}/conversations")
 def create_conversation(
+    project_slug: str,
     block_id: int,
     title: str = Form(...),
     db: Session = Depends(get_db),
 ):
+    project = get_project_by_slug_or_404(db, project_slug)
     block = db.get(TextBlock, block_id)
-    if not block:
+    if not block or block.project_id != project.id:
         raise HTTPException(status_code=404, detail="Text block not found")
     conversation = crud.create_conversation(
         db, project=block.project, title=title, source="other", external_id=None
     )
     crud.create_link(db, text_block=block, conversation=conversation, relation="ideation")
-    return RedirectResponse(url=f"/projects/{block.project_id}", status_code=303)
+    return RedirectResponse(url=f"/p/{project.slug}/dashboard", status_code=303)
 
 
-@app.post("/conversations/{conversation_id}/turns")
+@app.post("/p/{project_slug}/conversations/{conversation_id}/turns")
 def create_turn(
+    project_slug: str,
     conversation_id: int,
     prompt: str = Form(...),
     response: str | None = Form(None),
     use_openai: bool | None = Form(False),
     db: Session = Depends(get_db),
 ):
+    project = get_project_by_slug_or_404(db, project_slug)
     conversation = db.get(Conversation, conversation_id)
-    if not conversation:
+    if not conversation or conversation.project_id != project.id:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
-    project = conversation.project
     resolved_response = response or ""
     response_id: str | None = None
 
@@ -154,33 +194,141 @@ def create_turn(
         timestamp=datetime.utcnow(),
         response_id=response_id,
     )
-    return RedirectResponse(url=f"/projects/{project.id}", status_code=303)
+    return RedirectResponse(url=f"/p/{project.slug}/dashboard", status_code=303)
 
 
-@app.get("/search", response_class=HTMLResponse)
+@app.get("/p/{project_slug}/search", response_class=HTMLResponse)
 def search(
+    project_slug: str,
     request: Request,
     q: str | None = None,
     db: Session = Depends(get_db),
 ):
-    results = crud.search_turns(db, query=q) if q else []
+    project = get_project_by_slug_or_404(db, project_slug)
+    results = crud.search_turns_for_project(db, project_id=project.id, query=q) if q else []
+    projects = crud.list_projects(db)
     return templates.TemplateResponse(
-        "search.html",
-        {"request": request, "results": results, "query": q},
+        "project_search.html",
+        {
+            "request": request,
+            "project": project,
+            "projects": projects,
+            "results": results,
+            "query": q,
+        },
     )
 
 
-@app.get("/projects/{project_id}/export")
-def export_project(project_id: int, db: Session = Depends(get_db)):
-    project = crud.get_project(db, project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+@app.get("/p/{project_slug}/export")
+def export_project(project_slug: str, db: Session = Depends(get_db)):
+    project = get_project_by_slug_or_404(db, project_slug)
 
-    rows = crud.list_turns_for_project(db, project_id=project_id)
+    rows = crud.list_turns_for_project(db, project_id=project.id)
 
     def generate():
         for row in rows:
             yield json.dumps(dict(row), ensure_ascii=False) + "\n"
 
-    headers = {"Content-Disposition": f"attachment; filename=project_{project_id}.jsonl"}
+    headers = {"Content-Disposition": f"attachment; filename=project_{project.id}.jsonl"}
     return StreamingResponse(generate(), media_type="application/jsonl", headers=headers)
+
+
+@app.get("/p/{project_slug}/settings", response_class=HTMLResponse)
+def project_settings(project_slug: str, request: Request, db: Session = Depends(get_db)):
+    project = get_project_by_slug_or_404(db, project_slug)
+    projects = crud.list_projects(db)
+    settings_payload = json.dumps(project.settings_json, indent=2) if project.settings_json else ""
+    return templates.TemplateResponse(
+        "project_settings.html",
+        {
+            "request": request,
+            "project": project,
+            "projects": projects,
+            "settings_payload": settings_payload,
+            "error": None,
+        },
+    )
+
+
+@app.post("/p/{project_slug}/settings")
+def update_project_settings(
+    project_slug: str,
+    request: Request,
+    name: str = Form(...),
+    description: str | None = Form(None),
+    settings_payload: str | None = Form(None),
+    api_key: str | None = Form(None),
+    db: Session = Depends(get_db),
+):
+    project = get_project_by_slug_or_404(db, project_slug)
+    parsed_settings: dict | None = None
+    if settings_payload:
+        try:
+            parsed_settings = json.loads(settings_payload)
+        except json.JSONDecodeError as exc:
+            projects = crud.list_projects(db)
+            return templates.TemplateResponse(
+                "project_settings.html",
+                {
+                    "request": request,
+                    "project": project,
+                    "projects": projects,
+                    "settings_payload": settings_payload,
+                    "error": f"Invalid JSON: {exc.msg}",
+                },
+                status_code=400,
+            )
+    if name != project.name and crud.project_name_exists(db, name):
+        projects = crud.list_projects(db)
+        return templates.TemplateResponse(
+            "project_settings.html",
+            {
+                "request": request,
+                "project": project,
+                "projects": projects,
+                "settings_payload": settings_payload or "",
+                "error": "Project name already exists.",
+            },
+            status_code=400,
+        )
+    slug = project.slug
+    if name != project.name:
+        slug = build_unique_slug(db, name)
+    crud.update_project(
+        db,
+        project=project,
+        name=name,
+        slug=slug,
+        description=description,
+        settings_json=parsed_settings,
+    )
+    if api_key:
+        try:
+            api_key_encrypted = encrypt_secret(api_key)
+        except EncryptionError as exc:
+            projects = crud.list_projects(db)
+            return templates.TemplateResponse(
+                "project_settings.html",
+                {
+                    "request": request,
+                    "project": project,
+                    "projects": projects,
+                    "settings_payload": settings_payload or "",
+                    "error": str(exc),
+                },
+                status_code=400,
+            )
+        crud.upsert_project_secret(
+            db,
+            project=project,
+            secret_type="openai_api_key",
+            secret_ciphertext=api_key_encrypted,
+        )
+    return RedirectResponse(url=f"/p/{slug}/settings", status_code=303)
+
+
+@app.post("/p/{project_slug}/archive")
+def archive_project(project_slug: str, db: Session = Depends(get_db)):
+    project = get_project_by_slug_or_404(db, project_slug)
+    crud.soft_delete_project(db, project)
+    return RedirectResponse(url="/", status_code=303)

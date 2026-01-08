@@ -2,12 +2,21 @@
 {% block content %}
 <section class="card">
   <h2>Projects</h2>
+  {% if error %}
+    <p class="alert">{{ error }}</p>
+  {% endif %}
   {% if projects %}
     <ul class="list">
       {% for project in projects %}
-        <li>
-          <a href="/projects/{{ project.id }}">{{ project.name }}</a>
-          <p class="muted">{{ project.description or "No description" }}</p>
+        <li class="list-item">
+          <div>
+            <a href="/p/{{ project.slug }}/dashboard" class="title-link">{{ project.name }}</a>
+            <p class="muted">{{ project.description or "No description" }}</p>
+          </div>
+          <div class="row-actions">
+            <a href="/p/{{ project.slug }}/dashboard">Open</a>
+            <a href="/p/{{ project.slug }}/settings">Settings</a>
+          </div>
         </li>
       {% endfor %}
     </ul>
@@ -25,11 +34,11 @@
     </label>
     <label>
       Description
-      <textarea name="description" rows="3"></textarea>
+      <textarea name="description" rows="3" placeholder="Optional project summary"></textarea>
     </label>
     <label>
       OpenAI API Key
-      <input type="password" name="api_key">
+      <input type="password" name="api_key" placeholder="Optional">
     </label>
     <button type="submit">Create Project</button>
   </form>

@@ -12,11 +12,30 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 1.5rem;
 }
 
 .site-header a {
   color: #fff;
   text-decoration: none;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.project-pill {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+}
+
+.site-nav {
+  display: flex;
+  gap: 1rem;
 }
 
 .content {
@@ -25,7 +44,8 @@ body {
   gap: 1.5rem;
 }
 
-.panel {
+.panel,
+.card {
   background: #fff;
   padding: 1.5rem;
   border-radius: 12px;
@@ -41,6 +61,13 @@ body {
 .list li {
   padding: 0.75rem 0;
   border-bottom: 1px solid #e2e8f0;
+}
+
+.list-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
 }
 
 .form-grid {
@@ -74,6 +101,14 @@ button:hover {
   background: #1d4ed8;
 }
 
+.button-danger {
+  background: #dc2626;
+}
+
+.button-danger:hover {
+  background: #b91c1c;
+}
+
 .muted {
   color: #64748b;
   font-size: 0.9rem;
@@ -92,6 +127,22 @@ button:hover {
 
 .actions a {
   color: #2563eb;
+}
+
+.row-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.title-link {
+  font-weight: 600;
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.title-link:hover {
+  text-decoration: underline;
 }
 
 .conversation {
@@ -116,4 +167,76 @@ button:hover {
   display: flex;
   gap: 0.5rem;
   align-items: center;
+}
+
+.split {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.stat {
+  background: #f8fafc;
+  padding: 0.75rem;
+  border-radius: 10px;
+}
+
+.stat-label {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+.stat-value {
+  margin: 0.25rem 0 0;
+  font-size: 1.4rem;
+  font-weight: 600;
+}
+
+.pill {
+  display: inline-flex;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  background: #e2e8f0;
+  font-size: 0.8rem;
+}
+
+.pill-ok {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.pill-warn {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.stack {
+  display: grid;
+  gap: 1rem;
+}
+
+.subcard {
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 1rem;
+}
+
+.grow {
+  flex: 1;
+}
+
+.alert {
+  background: #fef2f2;
+  color: #b91c1c;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
 }

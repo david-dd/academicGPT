@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <div class="split">
+    <div>
+      <h2>{{ project.name }}</h2>
+      <p class="muted">{{ project.description or "No description yet." }}</p>
+    </div>
+    <div class="row-actions">
+      <a href="/p/{{ project.slug }}/settings">Edit settings</a>
+      <a href="/p/{{ project.slug }}/export">Export</a>
+    </div>
+  </div>
+  <div class="stats-grid">
+    <div class="stat">
+      <p class="stat-label">Textbausteine</p>
+      <p class="stat-value">{{ stats.text_blocks }}</p>
+    </div>
+    <div class="stat">
+      <p class="stat-label">Konversationen</p>
+      <p class="stat-value">{{ stats.conversations }}</p>
+    </div>
+    <div class="stat">
+      <p class="stat-label">Turns</p>
+      <p class="stat-value">{{ stats.turns }}</p>
+    </div>
+    <div class="stat">
+      <p class="stat-label">Key-Status</p>
+      <p class="stat-value">
+        {% if has_key %}
+          <span class="pill pill-ok">gesetzt</span>
+        {% else %}
+          <span class="pill pill-warn">fehlt</span>
+        {% endif %}
+      </p>
+    </div>
+  </div>
+</section>
+
+<section class="card">
+  <h3>Text Blocks</h3>
+  {% if project.text_blocks %}
+    <div class="stack">
+      {% for block in project.text_blocks %}
+      <article id="block-{{ block.id }}" class="subcard">
+        <div class="split">
+          <div>
+            <h4>{{ block.title }}</h4>
+            <p class="muted">{{ block.notes or "No notes" }}</p>
+          </div>
+          <span class="pill">{{ block.status }}</span>
+        </div>
+        <form method="post" action="/p/{{ project.slug }}/blocks/{{ block.id }}/conversations" class="form-inline">
+          <label class="grow">
+            New conversation title
+            <input type="text" name="title" required>
+          </label>
+          <button type="submit">Add Conversation</button>
+        </form>
+        {% if block.links %}
+          <div class="stack">
+            {% for link in block.links %}
+            <div id="conversation-{{ link.conversation.id }}" class="conversation">
+              <div class="split">
+                <div>
+                  <strong>{{ link.conversation.title }}</strong>
+                  <span class="muted">({{ link.relation }})</span>
+                  <p class="muted">Turns: {{ link.conversation.turns | length }}</p>
+                </div>
+                <span class="pill">{{ link.conversation.source }}</span>
+              </div>
+              <form method="post" action="/p/{{ project.slug }}/conversations/{{ link.conversation.id }}/turns" class="form-grid">
+                <label>
+                  Prompt
+                  <textarea name="prompt" rows="3" required></textarea>
+                </label>
+                <label>
+                  Response (optional if using OpenAI)
+                  <textarea name="response" rows="3"></textarea>
+                </label>
+                <label class="checkbox">
+                  <input type="checkbox" name="use_openai" value="true">
+                  Use OpenAI (requires key)
+                </label>
+                <button type="submit">Add Turns</button>
+              </form>
+            </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="muted">No conversations yet.</p>
+        {% endif %}
+      </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="muted">No text blocks yet. Add one below.</p>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h3>Add Text Block</h3>
+  <form method="post" action="/p/{{ project.slug }}/blocks" class="form-grid">
+    <label>
+      Title
+      <input type="text" name="title" required>
+    </label>
+    <label>
+      Notes
+      <textarea name="notes" rows="3"></textarea>
+    </label>
+    <button type="submit">Add Block</button>
+  </form>
+</section>
+
+<section class="card">
+  <h3>Switch Project</h3>
+  <ul class="list">
+    {% for entry in projects %}
+      <li class="list-item">
+        <div>
+          <strong>{{ entry.name }}</strong>
+          <p class="muted">{{ entry.description or "No description" }}</p>
+        </div>
+        {% if entry.id == project.id %}
+          <span class="pill pill-ok">Current</span>
+        {% else %}
+          <a href="/p/{{ entry.slug }}/dashboard">Open</a>
+        {% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endblock %}

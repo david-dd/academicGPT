@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h2>Project Settings</h2>
+  <p class="muted">Update project metadata and default model settings.</p>
+  {% if error %}
+    <p class="alert">{{ error }}</p>
+  {% endif %}
+  <form method="post" action="/p/{{ project.slug }}/settings" class="form-grid">
+    <label>
+      Project Name
+      <input type="text" name="name" value="{{ project.name }}" required>
+    </label>
+    <label>
+      Description
+      <textarea name="description" rows="3">{{ project.description or "" }}</textarea>
+    </label>
+    <label>
+      Default Model Settings (JSON)
+      <textarea name="settings_payload" rows="6" placeholder='{"model": "gpt-4o-mini", "temperature": 0.7}'>{{ settings_payload }}</textarea>
+    </label>
+    <label>
+      OpenAI API Key (optional)
+      <input type="password" name="api_key" placeholder="Leave blank to keep current">
+    </label>
+    <button type="submit">Save Settings</button>
+  </form>
+</section>
+
+<section class="card">
+  <h3>Project Actions</h3>
+  <p class="muted">Archive will hide the project from the main list.</p>
+  <form method="post" action="/p/{{ project.slug }}/archive" onsubmit="return confirm('Archive this project?');">
+    <button type="submit" class="button-danger">Archive Project</button>
+  </form>
+</section>
+
+<section class="card">
+  <h3>Switch Project</h3>
+  <ul class="list">
+    {% for entry in projects %}
+      <li class="list-item">
+        <div>
+          <strong>{{ entry.name }}</strong>
+          <p class="muted">{{ entry.description or "No description" }}</p>
+        </div>
+        {% if entry.id == project.id %}
+          <span class="pill pill-ok">Current</span>
+        {% else %}
+          <a href="/p/{{ entry.slug }}/settings">Open settings</a>
+        {% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endblock %}

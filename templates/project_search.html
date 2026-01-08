@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="card">
+  <h2>Search</h2>
+  <form method="get" action="/p/{{ project.slug }}/search" class="form-inline">
+    <input type="text" name="q" value="{{ query or '' }}" placeholder="Search prompts/responses" required />
+    <button type="submit">Search</button>
+  </form>
+</section>
+
+<section class="card">
+  <h3>Results</h3>
+  <ul class="list">
+    {% for result in results %}
+    <li class="list-item">
+      <div>
+        <p><strong>Content:</strong> {{ result.content_text }}</p>
+        <p class="muted">Conversation {{ result.conversation_id }}</p>
+      </div>
+      <a href="/p/{{ project.slug }}/dashboard#conversation-{{ result.conversation_id }}">Open</a>
+    </li>
+    {% else %}
+    <li class="muted">No results.</li>
+    {% endfor %}
+  </ul>
+</section>
+
+<section class="card">
+  <h3>Switch Project</h3>
+  <ul class="list">
+    {% for entry in projects %}
+      <li class="list-item">
+        <div>
+          <strong>{{ entry.name }}</strong>
+          <p class="muted">{{ entry.description or "No description" }}</p>
+        </div>
+        {% if entry.id == project.id %}
+          <span class="pill pill-ok">Current</span>
+        {% else %}
+          <a href="/p/{{ entry.slug }}/search?q={{ query or '' }}">Search</a>
+        {% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endblock %}
