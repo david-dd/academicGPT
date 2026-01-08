@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="panel">
+  <h2>Projects</h2>
+  <ul class="list">
+    {% for project in projects %}
+    <li>
+      <a href="/projects/{{ project.id }}">{{ project.name }}</a>
+      <p class="muted">{{ project.description or "No description" }}</p>
+    </li>
+    {% else %}
+    <li class="muted">No projects yet. Create one below.</li>
+    {% endfor %}
+  </ul>
+</section>
+
+<section class="panel">
+  <h2>Create Project</h2>
+  <form method="post" action="/projects" class="form-grid">
+    <label>
+      Name
+      <input type="text" name="name" required />
+    </label>
+    <label>
+      Description
+      <textarea name="description" rows="3"></textarea>
+    </label>
+    <label>
+      OpenAI API Key
+      <input type="password" name="api_key" placeholder="sk-..." />
+      <span class="muted">Stored encrypted with master passphrase.</span>
+    </label>
+    <button type="submit">Create</button>
+  </form>
+</section>
+{% endblock %}

@@ -1,0 +1,9 @@
+services:
+  ai-logger:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - AILOGGER_MASTER_PASSPHRASE=change-me
+    volumes:
+      - .:/app

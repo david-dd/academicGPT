@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="panel">
+  <h2>Search</h2>
+  <form method="get" action="/search" class="form-inline">
+    <input type="text" name="q" value="{{ query or '' }}" placeholder="Search prompts/responses" required />
+    <button type="submit">Search</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h3>Results</h3>
+  <ul class="list">
+    {% for result in results %}
+    <li>
+      <p><strong>Prompt:</strong> {{ result.prompt }}</p>
+      <p><strong>Response:</strong> {{ result.response }}</p>
+      <p class="muted">Project {{ result.project_id }}, Block {{ result.text_block_id }}</p>
+    </li>
+    {% else %}
+    <li class="muted">No results.</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endblock %}

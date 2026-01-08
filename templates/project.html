@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="panel">
+  <h2>{{ project.name }}</h2>
+  <p>{{ project.description or "No description" }}</p>
+  <div class="actions">
+    <a href="/search?q=&project_id={{ project.id }}">Search in project</a>
+    <a href="/projects/{{ project.id }}/export">Export JSONL</a>
+  </div>
+</section>
+
+<section class="panel">
+  <h3>Text Blocks</h3>
+  <div class="tabs">
+    {% for block in project.text_blocks %}
+    <article id="block-{{ block.id }}" class="tab">
+      <h4>{{ block.title }}</h4>
+      <p class="muted">{{ block.description or "No description" }}</p>
+
+      <form method="post" action="/blocks/{{ block.id }}/conversations" class="form-inline">
+        <input type="text" name="title" placeholder="New conversation title" required />
+        <button type="submit">Add Conversation</button>
+      </form>
+
+      {% for conversation in block.conversations %}
+      <div class="conversation" id="conversation-{{ conversation.id }}">
+        <h5>{{ conversation.title }}</h5>
+        <ul class="turns">
+          {% for turn in conversation.turns %}
+          <li>
+            <strong>Prompt:</strong> {{ turn.prompt }}<br />
+            <strong>Response:</strong> {{ turn.response }}
+          </li>
+          {% else %}
+          <li class="muted">No turns yet.</li>
+          {% endfor %}
+        </ul>
+        <form method="post" action="/conversations/{{ conversation.id }}/turns" class="form-grid">
+          <label>
+            Prompt
+            <textarea name="prompt" rows="3" required></textarea>
+          </label>
+          <label>
+            Response (optional for OpenAI)
+            <textarea name="response" rows="3"></textarea>
+          </label>
+          <label class="checkbox">
+            <input type="checkbox" name="use_openai" value="true" />
+            Generate via OpenAI
+          </label>
+          <button type="submit">Log Turn</button>
+        </form>
+      </div>
+      {% endfor %}
+    </article>
+    {% else %}
+    <p class="muted">No text blocks yet. Add one below.</p>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="panel">
+  <h3>Add Text Block</h3>
+  <form method="post" action="/projects/{{ project.id }}/blocks" class="form-grid">
+    <label>
+      Title
+      <input type="text" name="title" required />
+    </label>
+    <label>
+      Description
+      <textarea name="description" rows="3"></textarea>
+    </label>
+    <button type="submit">Add Block</button>
+  </form>
+</section>
+{% endblock %}
