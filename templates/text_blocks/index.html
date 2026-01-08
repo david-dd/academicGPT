@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <div class="split">
+    <div>
+      <h2>Textbausteine</h2>
+      <p class="muted">Zentrale Arbeitseinheit für Arbeitstexte, Notizen und Konversationen.</p>
+    </div>
+  </div>
+</section>
+
+<section class="tabs-layout">
+  <aside class="card tabs-list" id="block-list">
+    {% include "text_blocks/list.html" %}
+  </aside>
+  <section class="card tabs-detail" id="block-detail">
+    {% if selected_block %}
+      {% include "text_blocks/detail.html" %}
+    {% else %}
+      <p class="muted">Noch keine Textbausteine vorhanden.</p>
+    {% endif %}
+  </section>
+</section>
+{% endblock %}

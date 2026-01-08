@@ -1,0 +1,38 @@
+<div class="tab-header">
+  <h3>Alle Textbausteine</h3>
+  <p class="muted">Links auswählen, um Details rechts zu laden.</p>
+</div>
+
+<form method="post" action="/p/{{ project.slug }}/blocks" class="form-grid">
+  <label>
+    Titel
+    <input type="text" name="title" required>
+  </label>
+  <label>
+    Notizen
+    <textarea name="notes" rows="3"></textarea>
+  </label>
+  <button type="submit">Textbaustein hinzufügen</button>
+</form>
+
+<ul class="tab-items">
+  {% for block in blocks %}
+    <li class="tab-item {% if selected_block and block.id == selected_block.id %}is-active{% endif %}">
+      <a
+        class="tab-link"
+        href="/p/{{ project.slug }}/blocks/{{ block.id }}"
+        hx-get="/p/{{ project.slug }}/blocks/{{ block.id }}"
+        hx-target="#block-detail"
+        hx-swap="innerHTML"
+        hx-push-url="true"
+      >
+        <div>
+          <strong>{{ block.title }}</strong>
+          <p class="muted">TB-ID: {{ block.tb_id }} · {{ block.status }}</p>
+        </div>
+      </a>
+    </li>
+  {% else %}
+    <li class="muted">Keine Textbausteine angelegt.</li>
+  {% endfor %}
+</ul>

@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app import crud
 from app.db import get_db
-from app.models import Conversation, TextBlock
+from app.models import Conversation, Link, Project, TextBlock
 from app.openai_client import get_openai_client
 from app.security import EncryptionError, decrypt_secret, encrypt_secret
 
@@ -17,6 +17,8 @@ app = FastAPI(title="AI Logger")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 templates = Jinja2Templates(directory="templates")
+
+RELATION_TYPES = ["adopted", "supporting", "ideation", "rejected"]
 
 
 def slugify(value: str) -> str:
@@ -28,6 +30,27 @@ def get_project_by_slug_or_404(db: Session, project_slug: str):
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     return project
+
+
+def get_block_or_404(db: Session, project: Project, block_id: int) -> TextBlock:
+    block = db.get(TextBlock, block_id)
+    if not block or block.project_id != project.id:
+        raise HTTPException(status_code=404, detail="Text block not found")
+    return block
+
+
+def filter_links(
+    links: list[Link], relation: str | None = None, query: str | None = None
+) -> list[Link]:
+    filtered = links
+    if relation and relation != "all":
+        filtered = [link for link in filtered if link.relation == relation]
+    if query:
+        lowered = query.lower()
+        filtered = [
+            link for link in filtered if lowered in link.conversation.title.lower()
+        ]
+    return filtered
 
 
 def build_unique_slug(db: Session, name: str) -> str:
@@ -111,7 +134,7 @@ def create_block(
     db: Session = Depends(get_db),
 ):
     project = get_project_by_slug_or_404(db, project_slug)
-    crud.create_text_block(
+    block = crud.create_text_block(
         db,
         project=project,
         tb_id=f"TB-{project.id}-{title[:3].upper()}",
@@ -121,7 +144,223 @@ def create_block(
         notes=notes,
         working_text=None,
     )
-    return RedirectResponse(url=f"/p/{project.slug}/dashboard", status_code=303)
+    return RedirectResponse(
+        url=f"/p/{project.slug}/blocks?selected={block.id}", status_code=303
+    )
+
+
+@app.get("/p/{project_slug}/blocks", response_class=HTMLResponse)
+def list_blocks(
+    project_slug: str,
+    request: Request,
+    selected: int | None = None,
+    db: Session = Depends(get_db),
+):
+    project = get_project_by_slug_or_404(db, project_slug)
+    blocks = list(project.text_blocks)
+    selected_block = None
+    if selected is not None:
+        candidate = db.get(TextBlock, selected)
+        if candidate and candidate.project_id == project.id:
+            selected_block = candidate
+    if not selected_block and blocks:
+        selected_block = blocks[0]
+    link_relation = "all"
+    link_query = ""
+    filtered_links = (
+        filter_links(selected_block.links, link_relation, link_query)
+        if selected_block
+        else []
+    )
+    projects = crud.list_projects(db)
+    return templates.TemplateResponse(
+        "text_blocks/index.html",
+        {
+            "request": request,
+            "project": project,
+            "projects": projects,
+            "blocks": blocks,
+            "selected_block": selected_block,
+            "links": filtered_links,
+            "link_relation": link_relation,
+            "link_query": link_query,
+            "relation_types": RELATION_TYPES,
+            "project_conversations": project.conversations,
+        },
+    )
+
+
+@app.get("/p/{project_slug}/blocks/{block_id}", response_class=HTMLResponse)
+def block_detail(
+    project_slug: str,
+    block_id: int,
+    request: Request,
+    relation: str | None = None,
+    q: str | None = None,
+    db: Session = Depends(get_db),
+):
+    project = get_project_by_slug_or_404(db, project_slug)
+    block = get_block_or_404(db, project, block_id)
+    link_relation = relation or "all"
+    link_query = q or ""
+    filtered_links = filter_links(block.links, link_relation, link_query)
+    context = {
+        "request": request,
+        "project": project,
+        "block": block,
+        "links": filtered_links,
+        "link_relation": link_relation,
+        "link_query": link_query,
+        "relation_types": RELATION_TYPES,
+        "project_conversations": project.conversations,
+    }
+    if request.headers.get("HX-Request"):
+        return templates.TemplateResponse("text_blocks/detail.html", context)
+    blocks = list(project.text_blocks)
+    projects = crud.list_projects(db)
+    context.update(
+        {
+            "projects": projects,
+            "blocks": blocks,
+            "selected_block": block,
+        }
+    )
+    return templates.TemplateResponse("text_blocks/index.html", context)
+
+
+@app.post("/p/{project_slug}/blocks/{block_id}")
+def update_block(
+    project_slug: str,
+    block_id: int,
+    request: Request,
+    title: str = Form(...),
+    block_type: str = Form(...),
+    status: str = Form(...),
+    working_text: str | None = Form(None),
+    notes: str | None = Form(None),
+    db: Session = Depends(get_db),
+):
+    project = get_project_by_slug_or_404(db, project_slug)
+    block = get_block_or_404(db, project, block_id)
+    crud.update_text_block(
+        db,
+        block=block,
+        title=title,
+        block_type=block_type,
+        status=status,
+        working_text=working_text,
+        notes=notes,
+    )
+    if request.headers.get("HX-Request"):
+        return block_detail(
+            project_slug,
+            block_id,
+            request,
+            relation="all",
+            q="",
+            db=db,
+        )
+    return RedirectResponse(url=f"/p/{project.slug}/blocks?selected={block.id}", status_code=303)
+
+
+@app.get("/p/{project_slug}/blocks/{block_id}/links", response_class=HTMLResponse)
+def block_links(
+    project_slug: str,
+    block_id: int,
+    request: Request,
+    relation: str | None = None,
+    q: str | None = None,
+    db: Session = Depends(get_db),
+):
+    project = get_project_by_slug_or_404(db, project_slug)
+    block = get_block_or_404(db, project, block_id)
+    link_relation = relation or "all"
+    link_query = q or ""
+    filtered_links = filter_links(block.links, link_relation, link_query)
+    context = {
+        "request": request,
+        "project": project,
+        "block": block,
+        "links": filtered_links,
+        "link_relation": link_relation,
+        "link_query": link_query,
+        "relation_types": RELATION_TYPES,
+        "project_conversations": project.conversations,
+    }
+    if request.headers.get("HX-Request"):
+        return templates.TemplateResponse("text_blocks/links.html", context)
+    return RedirectResponse(
+        url=f"/p/{project.slug}/blocks/{block.id}?relation={link_relation}&q={link_query}",
+        status_code=303,
+    )
+
+
+@app.post("/p/{project_slug}/blocks/{block_id}/links")
+def add_block_link(
+    project_slug: str,
+    block_id: int,
+    request: Request,
+    relation: str = Form(...),
+    conversation_id: int | None = Form(None),
+    new_title: str | None = Form(None),
+    db: Session = Depends(get_db),
+):
+    project = get_project_by_slug_or_404(db, project_slug)
+    block = get_block_or_404(db, project, block_id)
+    if relation not in RELATION_TYPES:
+        raise HTTPException(status_code=400, detail="Invalid relation type")
+    conversation: Conversation
+    if conversation_id:
+        conversation = db.get(Conversation, conversation_id)
+        if not conversation or conversation.project_id != project.id:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+    else:
+        if not new_title:
+            raise HTTPException(status_code=400, detail="Conversation title required")
+        conversation = crud.create_conversation(
+            db,
+            project=project,
+            title=new_title,
+            source="manual",
+            external_id=None,
+        )
+    crud.create_link(db, text_block=block, conversation=conversation, relation=relation)
+    return block_links(
+        project_slug,
+        block_id,
+        request,
+        relation="all",
+        q="",
+        db=db,
+    )
+
+
+@app.post("/p/{project_slug}/blocks/{block_id}/links/{link_id}")
+def update_block_link(
+    project_slug: str,
+    block_id: int,
+    link_id: int,
+    request: Request,
+    relation: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    project = get_project_by_slug_or_404(db, project_slug)
+    block = get_block_or_404(db, project, block_id)
+    link = db.get(Link, link_id)
+    if not link or link.text_block_id != block.id:
+        raise HTTPException(status_code=404, detail="Link not found")
+    if relation not in RELATION_TYPES:
+        raise HTTPException(status_code=400, detail="Invalid relation type")
+    link.relation = relation
+    db.commit()
+    return block_links(
+        project_slug,
+        block_id,
+        request,
+        relation="all",
+        q="",
+        db=db,
+    )
 
 
 @app.post("/p/{project_slug}/blocks/{block_id}/conversations")

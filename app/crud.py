@@ -155,6 +155,48 @@ def create_text_block(
     return block
 
 
+def update_text_block(
+    db: Session,
+    block: TextBlock,
+    title: str | None = None,
+    block_type: str | None = None,
+    status: str | None = None,
+    notes: str | None = None,
+    working_text: str | None = None,
+) -> TextBlock:
+    if title is not None:
+        block.title = title
+    if block_type is not None:
+        block.type = block_type
+    if status is not None:
+        block.status = status
+    if notes is not None:
+        block.notes = notes
+    if working_text is not None:
+        block.working_text = working_text
+    db.commit()
+    db.refresh(block)
+    db.execute(
+        text(
+            """
+            UPDATE text_blocks_fts
+            SET title = :title,
+                notes = :notes,
+                working_text = :working_text
+            WHERE text_block_id = :text_block_id
+            """
+        ),
+        {
+            "text_block_id": block.id,
+            "title": block.title,
+            "notes": block.notes or "",
+            "working_text": block.working_text or "",
+        },
+    )
+    db.commit()
+    return block
+
+
 def create_conversation(
     db: Session,
     project: Project,

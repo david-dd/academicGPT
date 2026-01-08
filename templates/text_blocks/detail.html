@@ -1,0 +1,59 @@
+<div class="block-header">
+  <div>
+    <h3>{{ block.title }}</h3>
+    <p class="muted">Zuletzt aktualisiert: {{ block.updated_at.strftime("%d.%m.%Y %H:%M") }}</p>
+  </div>
+  <span class="pill">{{ block.status }}</span>
+</div>
+
+<div class="meta-grid">
+  <div>
+    <p class="muted">TB-ID</p>
+    <strong>{{ block.tb_id }}</strong>
+  </div>
+  <div>
+    <p class="muted">Typ</p>
+    <strong>{{ block.type }}</strong>
+  </div>
+  <div>
+    <p class="muted">Status</p>
+    <strong>{{ block.status }}</strong>
+  </div>
+</div>
+
+<form
+  method="post"
+  action="/p/{{ project.slug }}/blocks/{{ block.id }}"
+  class="form-grid"
+  hx-post="/p/{{ project.slug }}/blocks/{{ block.id }}"
+  hx-target="#block-detail"
+  hx-swap="innerHTML"
+>
+  <label>
+    Titel
+    <input type="text" name="title" value="{{ block.title }}" required>
+  </label>
+  <div class="form-inline">
+    <label class="grow">
+      Typ
+      <input type="text" name="block_type" value="{{ block.type }}" required>
+    </label>
+    <label class="grow">
+      Status
+      <input type="text" name="status" value="{{ block.status }}" required>
+    </label>
+  </div>
+  <label>
+    Working-Text
+    <textarea name="working_text" rows="6">{{ block.working_text or "" }}</textarea>
+  </label>
+  <label>
+    Notes
+    <textarea name="notes" rows="4">{{ block.notes or "" }}</textarea>
+  </label>
+  <button type="submit">Textbaustein speichern</button>
+</form>
+
+<section id="block-links" class="stack">
+  {% include "text_blocks/links.html" %}
+</section>
