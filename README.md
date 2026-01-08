@@ -18,13 +18,13 @@ and packaging the app. For a small MVP, it keeps commands consistent across dev 
 ## Setup
 
 ```bash
-poetry install
+py -3.12 -m poetry install
 ```
 
-Set a master passphrase (required for encrypting project API keys):
+Set a master passphrase (required for encrypting project API keys) within the .env file:
 
 ```bash
-export AILOGGER_MASTER_PASSPHRASE="your-strong-passphrase"
+AILOGGER_MASTER_PASSPHRASE="your-strong-passphrase"
 ```
 
 Run the database migration:
@@ -36,23 +36,11 @@ poetry run alembic upgrade head
 ## Run
 
 ```bash
-make dev
+py -3.12 -m poetry run uvicorn app.main:app --reload
 ```
 
 Visit `http://127.0.0.1:8000`.
 
-## Tests
-
-```bash
-make test
-```
-
-## Formatting & Linting
-
-```bash
-make format
-make lint
-```
 
 ## Docker (optional)
 

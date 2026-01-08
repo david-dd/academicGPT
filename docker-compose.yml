@@ -4,6 +4,6 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - AILOGGER_MASTER_PASSPHRASE=change-me
+      - AILOGGER_MASTER_PASSPHRASE=HeikTestChatGPTTest
     volumes:
       - .:/app
