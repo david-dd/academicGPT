@@ -1,26 +1,27 @@
 {% extends "base.html" %}
-
 {% block content %}
-<section class="panel">
+<section class="card">
   <h2>Projects</h2>
-  <ul class="list">
-    {% for project in projects %}
-    <li>
-      <a href="/projects/{{ project.id }}">{{ project.name }}</a>
-      <p class="muted">{{ project.description or "No description" }}</p>
-    </li>
-    {% else %}
-    <li class="muted">No projects yet. Create one below.</li>
-    {% endfor %}
-  </ul>
+  {% if projects %}
+    <ul class="list">
+      {% for project in projects %}
+        <li>
+          <a href="/projects/{{ project.id }}">{{ project.name }}</a>
+          <p class="muted">{{ project.description or "No description" }}</p>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="muted">No projects yet.</p>
+  {% endif %}
 </section>
 
-<section class="panel">
-  <h2>Create Project</h2>
+<section class="card">
+  <h3>Add Project</h3>
   <form method="post" action="/projects" class="form-grid">
     <label>
       Name
-      <input type="text" name="name" required />
+      <input type="text" name="name" required>
     </label>
     <label>
       Description
@@ -28,10 +29,9 @@
     </label>
     <label>
       OpenAI API Key
-      <input type="password" name="api_key" placeholder="sk-..." />
-      <span class="muted">Stored encrypted with master passphrase.</span>
+      <input type="password" name="api_key">
     </label>
-    <button type="submit">Create</button>
+    <button type="submit">Create Project</button>
   </form>
 </section>
 {% endblock %}

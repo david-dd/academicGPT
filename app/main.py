@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
@@ -18,6 +19,10 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 
+def slugify(value: str) -> str:
+    return "-".join(value.lower().strip().split())
+
+
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request, db: Session = Depends(get_db)):
     projects = crud.list_projects(db)
@@ -35,9 +40,17 @@ def create_project(
         api_key_encrypted = encrypt_secret(api_key) if api_key else None
     except EncryptionError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     project = crud.create_project(
-        db, name=name, description=description, api_key_encrypted=api_key_encrypted
+        db, name=name, slug=slugify(name), description=description, settings_json=None
     )
+    if api_key_encrypted:
+        crud.create_project_secret(
+            db,
+            project=project,
+            secret_type="openai_api_key",
+            secret_ciphertext=api_key_encrypted,
+        )
     return RedirectResponse(url=f"/projects/{project.id}", status_code=303)
 
 
@@ -55,13 +68,22 @@ def project_detail(project_id: int, request: Request, db: Session = Depends(get_
 def create_block(
     project_id: int,
     title: str = Form(...),
-    description: str | None = Form(None),
+    notes: str | None = Form(None),
     db: Session = Depends(get_db),
 ):
     project = crud.get_project(db, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    crud.create_text_block(db, project=project, title=title, description=description)
+    crud.create_text_block(
+        db,
+        project=project,
+        tb_id=f"TB-{project_id}-{title[:3].upper()}",
+        title=title,
+        block_type="draft",
+        status="active",
+        notes=notes,
+        working_text=None,
+    )
     return RedirectResponse(url=f"/projects/{project_id}", status_code=303)
 
 
@@ -74,10 +96,11 @@ def create_conversation(
     block = db.get(TextBlock, block_id)
     if not block:
         raise HTTPException(status_code=404, detail="Text block not found")
-    conversation = crud.create_conversation(db, block=block, title=title)
-    return RedirectResponse(
-        url=f"/projects/{block.project_id}#conversation-{conversation.id}", status_code=303
+    conversation = crud.create_conversation(
+        db, project=block.project, title=title, source="other", external_id=None
     )
+    crud.create_link(db, text_block=block, conversation=conversation, relation="ideation")
+    return RedirectResponse(url=f"/projects/{block.project_id}", status_code=303)
 
 
 @app.post("/conversations/{conversation_id}/turns")
@@ -92,43 +115,58 @@ def create_turn(
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
-    project = conversation.text_block.project
+    project = conversation.project
     resolved_response = response or ""
+    response_id: str | None = None
 
     if use_openai:
-        if not project.api_key_encrypted:
+        secret = next(
+            (s for s in project.secrets if s.secret_type == "openai_api_key"), None
+        )
+        if not secret:
             raise HTTPException(status_code=400, detail="Project API key not configured")
         try:
-            api_key = decrypt_secret(project.api_key_encrypted)
+            api_key = decrypt_secret(secret.secret_ciphertext)
         except EncryptionError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         client = get_openai_client(api_key)
         api_response = client.responses.create(
             model="gpt-4o-mini",
             input=prompt,
-            previous_response_id=conversation.openai_previous_response_id,
         )
         resolved_response = api_response.output_text
-        conversation.openai_previous_response_id = api_response.id
-        db.commit()
+        response_id = api_response.id
 
-    crud.create_turn(db, conversation=conversation, prompt=prompt, response=resolved_response)
-    return RedirectResponse(
-        url=f"/projects/{project.id}#conversation-{conversation_id}", status_code=303
+    crud.create_turn(
+        db,
+        conversation=conversation,
+        role="user",
+        content_text=prompt,
+        model="manual",
+        timestamp=datetime.utcnow(),
     )
+    crud.create_turn(
+        db,
+        conversation=conversation,
+        role="assistant",
+        content_text=resolved_response,
+        model="gpt-4o-mini" if use_openai else "manual",
+        timestamp=datetime.utcnow(),
+        response_id=response_id,
+    )
+    return RedirectResponse(url=f"/projects/{project.id}", status_code=303)
 
 
 @app.get("/search", response_class=HTMLResponse)
 def search(
     request: Request,
     q: str | None = None,
-    project_id: int | None = None,
     db: Session = Depends(get_db),
 ):
-    results = crud.search_turns(db, query=q, project_id=project_id) if q else []
+    results = crud.search_turns(db, query=q) if q else []
     return templates.TemplateResponse(
         "search.html",
-        {"request": request, "results": results, "query": q, "project_id": project_id},
+        {"request": request, "results": results, "query": q},
     )
 
 

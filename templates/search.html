@@ -14,9 +14,8 @@
   <ul class="list">
     {% for result in results %}
     <li>
-      <p><strong>Prompt:</strong> {{ result.prompt }}</p>
-      <p><strong>Response:</strong> {{ result.response }}</p>
-      <p class="muted">Project {{ result.project_id }}, Block {{ result.text_block_id }}</p>
+      <p><strong>Content:</strong> {{ result.content_text }}</p>
+      <p class="muted">Project {{ result.project_id }}, Conversation {{ result.conversation_id }}</p>
     </li>
     {% else %}
     <li class="muted">No results.</li>
