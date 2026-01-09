@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <div class="split">
+    <div>
+      <h2>Add Text Block</h2>
+      <p class="muted">Lege einen neuen Textbaustein für das Projekt an.</p>
+    </div>
+    <a class="button-link" href="/p/{{ project.slug }}/dashboard">Zurück zum Dashboard</a>
+  </div>
+</section>
+
+<section class="card">
+  <form method="post" action="/p/{{ project.slug }}/blocks" class="form-grid">
+    <label>
+      Title
+      <input type="text" name="title" required>
+    </label>
+    <label>
+      Notes
+      <textarea name="notes" rows="4"></textarea>
+    </label>
+    <button type="submit">Add Block</button>
+  </form>
+</section>
+{% endblock %}

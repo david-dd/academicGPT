@@ -448,6 +448,24 @@ def create_block(
     )
 
 
+@app.get("/p/{project_slug}/blocks/new", response_class=HTMLResponse)
+def new_block(
+    project_slug: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    project = get_project_by_slug_or_404(db, project_slug)
+    projects = crud.list_projects(db)
+    return templates.TemplateResponse(
+        "text_blocks/new.html",
+        {
+            "request": request,
+            "project": project,
+            "projects": projects,
+        },
+    )
+
+
 @app.get("/p/{project_slug}/blocks", response_class=HTMLResponse)
 def list_blocks(
     project_slug: str,
