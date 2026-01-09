@@ -136,20 +136,23 @@
       </div>
     </div>
   {% endif %}
-  <form method="post" action="/p/{{ project.slug }}/conversations/{{ conversation.id }}/system" class="form-grid chat-config">
-    <label>
-      System-Instruktion
-      <textarea
-        name="system_instruction"
-        rows="5"
-        placeholder="Beschreibe hier den gewünschten Stil oder die Rolle des Modells."
-      >{{ system_instruction }}</textarea>
-    </label>
-    <p class="muted">
-      Diese Instruktion steuert die Antwortweise und wird bei Bedarf für die nächste Nachricht verwendet.
-    </p>
-    <button type="submit">System-Kontext speichern</button>
-  </form>
+  <details class="chat-config-details">
+    <summary>System-Instruktion</summary>
+    <form method="post" action="/p/{{ project.slug }}/conversations/{{ conversation.id }}/system" class="form-grid chat-config">
+      <label>
+        System-Instruktion
+        <textarea
+          name="system_instruction"
+          rows="5"
+          placeholder="Beschreibe hier den gewünschten Stil oder die Rolle des Modells."
+        >{{ system_instruction }}</textarea>
+      </label>
+      <p class="muted">
+        Diese Instruktion steuert die Antwortweise und wird bei Bedarf für die nächste Nachricht verwendet.
+      </p>
+      <button type="submit">System-Kontext speichern</button>
+    </form>
+  </details>
   {% if turns %}
     <ul class="chat-thread">
       {% for turn in turns %}
