@@ -1216,6 +1216,21 @@ def export_project(
                 ]
             else:
                 payload["text_block_tb_ids"] = []
+            text_block_links = payload.get("text_block_links")
+            if text_block_links:
+                parsed_links = []
+                for link in text_block_links.split(","):
+                    if not link:
+                        continue
+                    if ":" not in link:
+                        continue
+                    block_id, relation = link.split(":", 1)
+                    if not block_id or not relation:
+                        continue
+                    parsed_links.append({"tb_id": block_id, "relation": relation})
+                payload["text_block_links"] = parsed_links
+            else:
+                payload["text_block_links"] = []
             yield json.dumps(payload, ensure_ascii=False) + "\n"
 
     headers = {"Content-Disposition": f"attachment; filename=project_{project.id}.jsonl"}

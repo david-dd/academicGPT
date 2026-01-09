@@ -529,7 +529,8 @@ def list_turns_for_project(
                    turns.timestamp AS timestamp,
                    conversations.id AS conversation_id,
                    projects.id AS project_id,
-                   GROUP_CONCAT(text_blocks.tb_id) AS text_block_tb_ids
+                   GROUP_CONCAT(text_blocks.tb_id) AS text_block_tb_ids,
+                   GROUP_CONCAT(text_blocks.tb_id || ':' || links.relation) AS text_block_links
             FROM turns
             JOIN conversations ON conversations.id = turns.conversation_id
             JOIN projects ON projects.id = conversations.project_id
