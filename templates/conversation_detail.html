@@ -10,6 +10,17 @@
       <a href="/p/{{ project.slug }}/conversations">All conversations</a>
     </div>
   </div>
+  <form method="post" action="/p/{{ project.slug }}/conversations/{{ conversation.id }}/meta" class="form-grid">
+    <label>
+      Titel
+      <input type="text" name="title" value="{{ conversation.title }}" required>
+    </label>
+    <label>
+      Beschreibung / Notiz
+      <textarea name="notes" rows="3">{{ conversation.notes or "" }}</textarea>
+    </label>
+    <button type="submit">Metadaten speichern</button>
+  </form>
 </section>
 
 <section class="card">

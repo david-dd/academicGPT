@@ -39,50 +39,38 @@
 
 <section class="card">
   <h3>Text Blocks</h3>
-  {% if project.text_blocks %}
-    <div class="stack">
-      {% for block in project.text_blocks %}
-      <article id="block-{{ block.id }}" class="subcard">
-        <div class="split">
-          <div>
-            <h4>{{ block.title }}</h4>
-            <p class="muted">{{ block.notes or "No notes" }}</p>
-          </div>
-          <span class="pill">{{ block.status }}</span>
-        </div>
-        <form method="post" action="/p/{{ project.slug }}/blocks/{{ block.id }}/conversations" class="form-inline">
-          <label class="grow">
-            New conversation title
-            <input type="text" name="title" required>
-          </label>
-          <button type="submit">Add Conversation</button>
-        </form>
-        {% if block.links %}
-          <div class="stack">
-            {% for link in block.links %}
-            <div id="conversation-{{ link.conversation.id }}" class="conversation">
-              <div class="split">
-                <div>
-                  <strong>{{ link.conversation.title }}</strong>
-                  <span class="muted">({{ relation_labels[link.relation] }})</span>
-                  <p class="muted">Turns: {{ link.conversation.turns | length }}</p>
-                </div>
-                <span class="pill">{{ link.conversation.source }}</span>
-              </div>
-              <div class="row-actions">
-                <a href="/p/{{ project.slug }}/conversations/{{ link.conversation.id }}">Open chat</a>
-              </div>
-            </div>
-            {% endfor %}
-          </div>
-        {% else %}
-          <p class="muted">No conversations yet.</p>
-        {% endif %}
-      </article>
-      {% endfor %}
+  {% if text_blocks_overview %}
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>CrateDate</th>
+            <th>ID</th>
+            <th>Beschreibung (Note)</th>
+            <th>Konversationen</th>
+            <th>Turns (Summe)</th>
+            <th>Details</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for entry in text_blocks_overview %}
+            <tr>
+              <td>{{ entry.block.created_at.strftime("%d.%m.%Y %H:%M") }}</td>
+              <td>{{ entry.block.tb_id }}</td>
+              <td>
+                <strong>{{ entry.block.title }}</strong>
+                <p class="muted">{{ entry.block.notes or "Noch keine Notiz." }}</p>
+              </td>
+              <td>{{ entry.conversation_count }}</td>
+              <td>{{ entry.turn_count }}</td>
+              <td><a href="/p/{{ project.slug }}/blocks/{{ entry.block.id }}">Öffnen</a></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
   {% else %}
-    <p class="muted">No text blocks yet. Add one below.</p>
+    <p class="muted">Noch keine Textbausteine vorhanden.</p>
   {% endif %}
 </section>
 

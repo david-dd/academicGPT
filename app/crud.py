@@ -206,14 +206,72 @@ def create_conversation(
     title: str,
     source: str,
     external_id: str | None = None,
+    notes: str | None = None,
 ) -> Conversation:
     conversation = Conversation(
-        project=project, title=title, source=source, external_id=external_id
+        project=project,
+        title=title,
+        source=source,
+        external_id=external_id,
+        notes=notes,
     )
     db.add(conversation)
     db.commit()
     db.refresh(conversation)
     return conversation
+
+
+def update_conversation(
+    db: Session,
+    conversation: Conversation,
+    title: str | None = None,
+    notes: str | None = None,
+) -> Conversation:
+    if title is not None:
+        conversation.title = title
+    if notes is not None:
+        conversation.notes = notes
+    db.commit()
+    db.refresh(conversation)
+    return conversation
+
+
+def list_text_blocks_overview(db: Session, project_id: int) -> list[dict]:
+    stmt = (
+        select(
+            TextBlock,
+            func.count(func.distinct(Link.conversation_id)).label("conversation_count"),
+            func.count(Turn.id).label("turn_count"),
+        )
+        .outerjoin(Link, Link.text_block_id == TextBlock.id)
+        .outerjoin(Turn, Turn.conversation_id == Link.conversation_id)
+        .where(TextBlock.project_id == project_id)
+        .group_by(TextBlock.id)
+        .order_by(TextBlock.created_at.desc(), TextBlock.id.desc())
+    )
+    rows = db.execute(stmt).all()
+    return [
+        {
+            "block": row[0],
+            "conversation_count": row[1] or 0,
+            "turn_count": row[2] or 0,
+        }
+        for row in rows
+    ]
+
+
+def get_turn_counts_for_conversations(
+    db: Session, conversation_ids: list[int]
+) -> dict[int, int]:
+    if not conversation_ids:
+        return {}
+    stmt = (
+        select(Turn.conversation_id, func.count(Turn.id))
+        .where(Turn.conversation_id.in_(conversation_ids))
+        .group_by(Turn.conversation_id)
+    )
+    rows = db.execute(stmt).all()
+    return {row[0]: row[1] for row in rows}
 
 
 def create_turn(
@@ -434,11 +492,14 @@ def list_turns_for_project(db: Session, project_id: int) -> list[dict]:
                    turns.model AS model,
                    turns.timestamp AS timestamp,
                    conversations.id AS conversation_id,
-                   projects.id AS project_id
+                   projects.id AS project_id,
+                   GROUP_CONCAT(links.text_block_id) AS text_block_ids
             FROM turns
             JOIN conversations ON conversations.id = turns.conversation_id
             JOIN projects ON projects.id = conversations.project_id
+            LEFT JOIN links ON links.conversation_id = conversations.id
             WHERE projects.id = :project_id
+            GROUP BY turns.id
             ORDER BY turns.timestamp DESC
             """
         ),

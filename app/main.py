@@ -362,6 +362,7 @@ def create_project(
 def project_dashboard(project_slug: str, request: Request, db: Session = Depends(get_db)):
     project = get_project_by_slug_or_404(db, project_slug)
     stats = crud.get_project_stats(db, project_id=project.id)
+    text_blocks_overview = crud.list_text_blocks_overview(db, project_id=project.id)
     has_key = any(secret.secret_type == "openai_api_key" for secret in project.secrets)
     projects = crud.list_projects(db)
     return templates.TemplateResponse(
@@ -372,6 +373,7 @@ def project_dashboard(project_slug: str, request: Request, db: Session = Depends
             "projects": projects,
             "stats": stats,
             "has_key": has_key,
+            "text_blocks_overview": text_blocks_overview,
             "relation_labels": RELATION_LABELS,
         },
     )
@@ -397,11 +399,17 @@ def create_project_conversation(
     project_slug: str,
     title: str = Form(...),
     system_instruction: str | None = Form(None),
+    notes: str | None = Form(None),
     db: Session = Depends(get_db),
 ):
     project = get_project_by_slug_or_404(db, project_slug)
     conversation = crud.create_conversation(
-        db, project=project, title=title, source="openai", external_id=None
+        db,
+        project=project,
+        title=title,
+        source="openai",
+        external_id=None,
+        notes=notes,
     )
     if system_instruction and system_instruction.strip():
         crud.create_turn(
@@ -469,6 +477,8 @@ def list_blocks(
         if selected_block
         else []
     )
+    conversation_ids = [link.conversation.id for link in filtered_links]
+    turn_counts = crud.get_turn_counts_for_conversations(db, conversation_ids)
     projects = crud.list_projects(db)
     return templates.TemplateResponse(
         "text_blocks/index.html",
@@ -479,6 +489,7 @@ def list_blocks(
             "blocks": blocks,
             "selected_block": selected_block,
             "links": filtered_links,
+            "turn_counts": turn_counts,
             "link_relation": link_relation,
             "link_query": link_query,
             "relation_types": RELATION_TYPES,
@@ -508,6 +519,8 @@ def block_detail(
         db=db,
         project_id=project.id,
     )
+    conversation_ids = [link.conversation.id for link in filtered_links]
+    turn_counts = crud.get_turn_counts_for_conversations(db, conversation_ids)
     highlight_terms = extract_query_terms(q)
     highlight_pattern = build_highlight_pattern(highlight_terms)
     search_highlights = []
@@ -525,6 +538,7 @@ def block_detail(
         "project": project,
         "block": block,
         "links": filtered_links,
+        "turn_counts": turn_counts,
         "link_relation": link_relation,
         "link_query": link_query,
         "relation_types": RELATION_TYPES,
@@ -602,11 +616,14 @@ def block_links(
         db=db,
         project_id=project.id,
     )
+    conversation_ids = [link.conversation.id for link in filtered_links]
+    turn_counts = crud.get_turn_counts_for_conversations(db, conversation_ids)
     context = {
         "request": request,
         "project": project,
         "block": block,
         "links": filtered_links,
+        "turn_counts": turn_counts,
         "link_relation": link_relation,
         "link_query": link_query,
         "relation_types": RELATION_TYPES,
@@ -629,6 +646,7 @@ def add_block_link(
     relation: str = Form(...),
     conversation_id: int | None = Form(None),
     new_title: str | None = Form(None),
+    new_notes: str | None = Form(None),
     db: Session = Depends(get_db),
 ):
     project = get_project_by_slug_or_404(db, project_slug)
@@ -649,6 +667,7 @@ def add_block_link(
             title=new_title,
             source="manual",
             external_id=None,
+            notes=new_notes,
         )
     crud.create_link(db, text_block=block, conversation=conversation, relation=relation)
     return block_links(
@@ -694,6 +713,7 @@ def create_conversation(
     project_slug: str,
     block_id: int,
     title: str = Form(...),
+    notes: str | None = Form(None),
     db: Session = Depends(get_db),
 ):
     project = get_project_by_slug_or_404(db, project_slug)
@@ -701,7 +721,12 @@ def create_conversation(
     if not block or block.project_id != project.id:
         raise HTTPException(status_code=404, detail="Text block not found")
     conversation = crud.create_conversation(
-        db, project=block.project, title=title, source="other", external_id=None
+        db,
+        project=block.project,
+        title=title,
+        source="other",
+        external_id=None,
+        notes=notes,
     )
     crud.create_link(db, text_block=block, conversation=conversation, relation="ideation")
     return RedirectResponse(url=f"/p/{project.slug}/dashboard", status_code=303)
@@ -758,6 +783,22 @@ def update_conversation_link(
         raise HTTPException(status_code=400, detail="Invalid relation type")
     link.relation = relation
     db.commit()
+    return RedirectResponse(
+        url=f"/p/{project.slug}/conversations/{conversation.id}", status_code=303
+    )
+
+
+@app.post("/p/{project_slug}/conversations/{conversation_id}/meta")
+def update_conversation_meta(
+    project_slug: str,
+    conversation_id: int,
+    title: str = Form(...),
+    notes: str | None = Form(None),
+    db: Session = Depends(get_db),
+):
+    project = get_project_by_slug_or_404(db, project_slug)
+    conversation = get_conversation_or_404(db, project, conversation_id)
+    crud.update_conversation(db, conversation=conversation, title=title, notes=notes)
     return RedirectResponse(
         url=f"/p/{project.slug}/conversations/{conversation.id}", status_code=303
     )
@@ -967,7 +1008,15 @@ def export_project(project_slug: str, db: Session = Depends(get_db)):
 
     def generate():
         for row in rows:
-            yield json.dumps(dict(row), ensure_ascii=False) + "\n"
+            payload = dict(row)
+            text_block_ids = payload.get("text_block_ids")
+            if text_block_ids:
+                payload["text_block_ids"] = [
+                    int(block_id) for block_id in text_block_ids.split(",") if block_id
+                ]
+            else:
+                payload["text_block_ids"] = []
+            yield json.dumps(payload, ensure_ascii=False) + "\n"
 
     headers = {"Content-Disposition": f"attachment; filename=project_{project.id}.jsonl"}
     return StreamingResponse(generate(), media_type="application/jsonl", headers=headers)
