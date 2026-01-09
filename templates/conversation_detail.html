@@ -96,12 +96,38 @@
 
 <section class="card">
   <h3>Send message</h3>
-  <form method="post" action="/p/{{ project.slug }}/conversations/{{ conversation.id }}/messages" class="form-grid">
+  <form method="post" action="/p/{{ project.slug }}/conversations/{{ conversation.id }}/messages" class="form-grid" data-message-form>
     <label>
       Message
       <textarea name="message" rows="4" required></textarea>
     </label>
     <button type="submit">Send</button>
   </form>
+  <p id="message-status" class="status-message{% if error %} status-error{% endif %}" aria-live="polite">
+    {% if error %}
+      Fehler beim Senden – bitte prüfen Sie die Meldung oben.
+    {% else %}
+      Bereit für eine neue Nachricht.
+    {% endif %}
+  </p>
 </section>
+<script>
+  const messageForm = document.querySelector("[data-message-form]");
+  const messageStatus = document.getElementById("message-status");
+  if (messageForm && messageStatus) {
+    messageForm.addEventListener("submit", () => {
+      messageStatus.textContent = "Nachricht wird gesendet …";
+      messageStatus.classList.add("status-pending");
+      const submitButton = messageForm.querySelector("button[type='submit']");
+      if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.textContent = "Wird gesendet …";
+      }
+      const messageInput = messageForm.querySelector("textarea[name='message']");
+      if (messageInput) {
+        messageInput.setAttribute("readonly", "readonly");
+      }
+    });
+  }
+</script>
 {% endblock %}

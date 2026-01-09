@@ -25,6 +25,22 @@
     </label>
     <button type="submit">Save Settings</button>
   </form>
+  <div class="subcard">
+    <div class="split">
+      <div>
+        <strong>API key check</strong>
+        <p class="muted">Test the current project API key before sending requests.</p>
+      </div>
+      <form method="post" action="/p/{{ project.slug }}/settings/test-api-key">
+        <button type="submit">Test API key</button>
+      </form>
+    </div>
+    {% if test_result %}
+      <p class="alert {% if test_status == 'success' %}alert-success{% else %}alert-error{% endif %}">
+        {{ test_result }}
+      </p>
+    {% endif %}
+  </div>
 </section>
 
 <section class="card">

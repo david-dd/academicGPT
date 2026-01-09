@@ -154,6 +154,30 @@ def render_conversation_detail(
     )
 
 
+def render_project_settings(
+    request: Request,
+    project: Project,
+    db: Session,
+    settings_payload: str,
+    error: str | None = None,
+    test_result: str | None = None,
+    test_status: str | None = None,
+):
+    projects = crud.list_projects(db)
+    return templates.TemplateResponse(
+        "project_settings.html",
+        {
+            "request": request,
+            "project": project,
+            "projects": projects,
+            "settings_payload": settings_payload,
+            "error": error,
+            "test_result": test_result,
+            "test_status": test_status,
+        },
+    )
+
+
 def filter_links(
     links: list[Link],
     relation: str | None = None,
@@ -861,17 +885,15 @@ def export_project(project_slug: str, db: Session = Depends(get_db)):
 @app.get("/p/{project_slug}/settings", response_class=HTMLResponse)
 def project_settings(project_slug: str, request: Request, db: Session = Depends(get_db)):
     project = get_project_by_slug_or_404(db, project_slug)
-    projects = crud.list_projects(db)
     settings_payload = json.dumps(project.settings_json, indent=2) if project.settings_json else ""
-    return templates.TemplateResponse(
-        "project_settings.html",
-        {
-            "request": request,
-            "project": project,
-            "projects": projects,
-            "settings_payload": settings_payload,
-            "error": None,
-        },
+    return render_project_settings(
+        request=request,
+        project=project,
+        db=db,
+        settings_payload=settings_payload,
+        error=None,
+        test_result=None,
+        test_status=None,
     )
 
 
@@ -891,30 +913,24 @@ def update_project_settings(
         try:
             parsed_settings = json.loads(settings_payload)
         except json.JSONDecodeError as exc:
-            projects = crud.list_projects(db)
-            return templates.TemplateResponse(
-                "project_settings.html",
-                {
-                    "request": request,
-                    "project": project,
-                    "projects": projects,
-                    "settings_payload": settings_payload,
-                    "error": f"Invalid JSON: {exc.msg}",
-                },
-                status_code=400,
+            return render_project_settings(
+                request=request,
+                project=project,
+                db=db,
+                settings_payload=settings_payload,
+                error=f"Invalid JSON: {exc.msg}",
+                test_result=None,
+                test_status=None,
             )
     if name != project.name and crud.project_name_exists(db, name):
-        projects = crud.list_projects(db)
-        return templates.TemplateResponse(
-            "project_settings.html",
-            {
-                "request": request,
-                "project": project,
-                "projects": projects,
-                "settings_payload": settings_payload or "",
-                "error": "Project name already exists.",
-            },
-            status_code=400,
+        return render_project_settings(
+            request=request,
+            project=project,
+            db=db,
+            settings_payload=settings_payload or "",
+            error="Project name already exists.",
+            test_result=None,
+            test_status=None,
         )
     slug = project.slug
     if name != project.name:
@@ -931,17 +947,14 @@ def update_project_settings(
         try:
             api_key_encrypted = encrypt_secret(api_key)
         except EncryptionError as exc:
-            projects = crud.list_projects(db)
-            return templates.TemplateResponse(
-                "project_settings.html",
-                {
-                    "request": request,
-                    "project": project,
-                    "projects": projects,
-                    "settings_payload": settings_payload or "",
-                    "error": str(exc),
-                },
-                status_code=400,
+            return render_project_settings(
+                request=request,
+                project=project,
+                db=db,
+                settings_payload=settings_payload or "",
+                error=str(exc),
+                test_result=None,
+                test_status=None,
             )
         crud.upsert_project_secret(
             db,
@@ -950,6 +963,77 @@ def update_project_settings(
             secret_ciphertext=api_key_encrypted,
         )
     return RedirectResponse(url=f"/p/{slug}/settings", status_code=303)
+
+
+@app.post("/p/{project_slug}/settings/test-api-key", response_class=HTMLResponse)
+def test_project_settings_api_key(
+    project_slug: str, request: Request, db: Session = Depends(get_db)
+):
+    project = get_project_by_slug_or_404(db, project_slug)
+    settings_payload = json.dumps(project.settings_json, indent=2) if project.settings_json else ""
+    try:
+        api_key = get_project_openai_key(project)
+        client = get_openai_client(api_key)
+        client.models.list()
+    except HTTPException as exc:
+        return render_project_settings(
+            request=request,
+            project=project,
+            db=db,
+            settings_payload=settings_payload,
+            error=None,
+            test_result=str(exc.detail),
+            test_status="error",
+        )
+    except AuthenticationError:
+        return render_project_settings(
+            request=request,
+            project=project,
+            db=db,
+            settings_payload=settings_payload,
+            error=None,
+            test_result="Authentication failed. Please check the project API key.",
+            test_status="error",
+        )
+    except RateLimitError:
+        return render_project_settings(
+            request=request,
+            project=project,
+            db=db,
+            settings_payload=settings_payload,
+            error=None,
+            test_result="Rate limit reached. Please wait and try again.",
+            test_status="error",
+        )
+    except APIStatusError as exc:
+        return render_project_settings(
+            request=request,
+            project=project,
+            db=db,
+            settings_payload=settings_payload,
+            error=None,
+            test_result=f"API error: {exc.status_code} {exc.message}",
+            test_status="error",
+        )
+    except OpenAIError as exc:
+        return render_project_settings(
+            request=request,
+            project=project,
+            db=db,
+            settings_payload=settings_payload,
+            error=None,
+            test_result=f"API error: {exc}",
+            test_status="error",
+        )
+    return render_project_settings(
+        request=request,
+        project=project,
+        db=db,
+        settings_payload=settings_payload,
+        error=None,
+        test_result="API key verified. OpenAI connection looks good.",
+        test_status="success",
+    )
 
 
 @app.post("/p/{project_slug}/archive")
