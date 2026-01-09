@@ -10,6 +10,32 @@
       <a href="/p/{{ project.slug }}/conversations">All conversations</a>
     </div>
   </div>
+  <div class="context-panel">
+    <div>
+      <h3>Aktueller Kontext</h3>
+      <p class="muted">
+        Konversation ID: <strong>{{ conversation.id }}</strong>
+      </p>
+      <p class="muted">
+        Beschreibung: {{ conversation.notes or "Keine Beschreibung vorhanden." }}
+      </p>
+    </div>
+    <div>
+      <h4>Textbausteine</h4>
+      {% if conversation.links %}
+        <ul class="list compact-list">
+          {% for link in conversation.links %}
+            <li class="list-item">
+              <strong>#{{ link.text_block.id }} · {{ link.text_block.title }}</strong>
+              <p class="muted">Relation: {{ relation_labels[link.relation] }}</p>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="muted">Noch keine Textbausteine verknüpft.</p>
+      {% endif %}
+    </div>
+  </div>
   <form method="post" action="/p/{{ project.slug }}/conversations/{{ conversation.id }}/meta" class="form-grid">
     <label>
       Titel
@@ -81,7 +107,10 @@
 </section>
 
 <section class="card">
-  <h3>Chat</h3>
+  <div class="split">
+    <h3>Chat</h3>
+    <span class="muted">Nachricht senden</span>
+  </div>
   {% if error %}
     <p class="error">{{ error }}</p>
   {% endif %}
@@ -140,10 +169,6 @@
   {% else %}
     <p class="muted">No messages yet. Send the first one below.</p>
   {% endif %}
-</section>
-
-<section class="card">
-  <h3>Send message</h3>
   <form
     method="post"
     action="/p/{{ project.slug }}/conversations/{{ conversation.id }}/messages"
@@ -151,23 +176,25 @@
     data-message-form
   >
     <label>
-      Modell auswählen
-      <select name="model" required>
-        {% if available_models %}
-          {% for model in available_models %}
-            <option value="{{ model }}" {% if model == selected_model %}selected{% endif %}>{{ model }}</option>
-          {% endfor %}
-        {% else %}
-          <option value="{{ selected_model }}">{{ selected_model }}</option>
-        {% endif %}
-      </select>
-    </label>
-    <label>
       Message
       <div class="composer">
         <textarea name="message" rows="6" class="message-textarea" required data-message-input></textarea>
         <div class="composer-actions">
-          <span class="muted composer-count" data-message-count>0 Zeichen</span>
+          <div class="composer-actions-left">
+            <label class="composer-model">
+              Modell
+              <select name="model" required>
+                {% if available_models %}
+                  {% for model in available_models %}
+                    <option value="{{ model }}" {% if model == selected_model %}selected{% endif %}>{{ model }}</option>
+                  {% endfor %}
+                {% else %}
+                  <option value="{{ selected_model }}">{{ selected_model }}</option>
+                {% endif %}
+              </select>
+            </label>
+            <span class="muted composer-count" data-message-count>0 Zeichen</span>
+          </div>
           <button type="submit" class="composer-send">Send</button>
         </div>
       </div>
