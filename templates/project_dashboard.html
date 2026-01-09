@@ -8,7 +8,13 @@
     </div>
     <div class="row-actions">
       <a href="/p/{{ project.slug }}/settings">Edit settings</a>
-      <a href="/p/{{ project.slug }}/export">Export</a>
+      <form method="get" action="/p/{{ project.slug }}/export" class="form-inline">
+        <label class="form-inline">
+          <input type="checkbox" name="include_archived" value="true">
+          Archivierte Textbausteine exportieren
+        </label>
+        <button type="submit">Export</button>
+      </form>
     </div>
   </div>
   <div class="stats-grid">

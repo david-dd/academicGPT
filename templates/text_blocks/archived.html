@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <div class="split">
+    <div>
+      <h2>Archivierte Textbausteine</h2>
+      <p class="muted">Diese Bausteine erscheinen nicht in der aktiven Liste.</p>
+    </div>
+    <a href="/p/{{ project.slug }}/blocks">Zurück zu aktiven Textbausteinen</a>
+  </div>
+</section>
+
+<section class="tabs-layout">
+  <aside class="card tabs-list" id="archived-block-list">
+    <div class="tab-header">
+      <h3>Archiv</h3>
+      <p class="muted">Links auswählen, um Details rechts zu laden.</p>
+    </div>
+    <ul class="tab-items">
+      {% for block in blocks %}
+        <li class="tab-item {% if selected_block and block.id == selected_block.id %}is-active{% endif %}">
+          <a
+            class="tab-link"
+            href="/p/{{ project.slug }}/blocks/archived?selected={{ block.id }}"
+            hx-get="/p/{{ project.slug }}/blocks/{{ block.id }}"
+            hx-target="#archived-block-detail"
+            hx-swap="innerHTML"
+            hx-push-url="/p/{{ project.slug }}/blocks/archived?selected={{ block.id }}"
+          >
+            <div>
+              <strong>{{ block.title }}</strong>
+              <p class="muted">TB-ID: {{ block.tb_id }} · {{ block.status }}</p>
+            </div>
+          </a>
+        </li>
+      {% else %}
+        <li class="muted">Keine archivierten Textbausteine vorhanden.</li>
+      {% endfor %}
+    </ul>
+  </aside>
+  <section class="card tabs-detail" id="archived-block-detail">
+    {% if selected_block %}
+      {% with block=selected_block %}
+        {% include "text_blocks/detail.html" %}
+      {% endwith %}
+    {% else %}
+      <p class="muted">Noch keine archivierten Textbausteine vorhanden.</p>
+    {% endif %}
+  </section>
+</section>
+{% endblock %}

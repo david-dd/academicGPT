@@ -251,6 +251,13 @@ button:hover {
   gap: 1rem;
 }
 
+.pill-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
 .meta-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));

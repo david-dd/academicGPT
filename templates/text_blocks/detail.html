@@ -3,7 +3,12 @@
     <h3>{{ block.title }}</h3>
     <p class="muted">Zuletzt aktualisiert: {{ block.updated_at.strftime("%d.%m.%Y %H:%M") }}</p>
   </div>
-  <span class="pill">{{ block.status }}</span>
+  <div class="pill-group">
+    {% if block.archived %}
+      <span class="pill pill-warn">Archiviert</span>
+    {% endif %}
+    <span class="pill">{{ block.status }}</span>
+  </div>
 </div>
 
 <div class="meta-grid">
@@ -18,6 +23,10 @@
   <div>
     <p class="muted">Status</p>
     <strong>{{ block.status }}</strong>
+  </div>
+  <div>
+    <p class="muted">Archiviert</p>
+    <strong>{{ "Ja" if block.archived else "Nein" }}</strong>
   </div>
 </div>
 
@@ -40,7 +49,7 @@
   action="/p/{{ project.slug }}/blocks/{{ block.id }}"
   class="form-grid"
   hx-post="/p/{{ project.slug }}/blocks/{{ block.id }}"
-  hx-target="#block-detail"
+  hx-target="closest .tabs-detail"
   hx-swap="innerHTML"
 >
   <label>
@@ -66,6 +75,23 @@
     <textarea name="notes" rows="4">{{ block.notes or "" }}</textarea>
   </label>
   <button type="submit">Textbaustein speichern</button>
+</form>
+
+<form
+  method="post"
+  action="/p/{{ project.slug }}/blocks/{{ block.id }}/archive"
+  class="form-inline"
+  hx-post="/p/{{ project.slug }}/blocks/{{ block.id }}/archive"
+  hx-target="closest .tabs-detail"
+  hx-swap="innerHTML"
+>
+  {% if block.archived %}
+    <input type="hidden" name="archived" value="false">
+    <button type="submit">Archivierung aufheben</button>
+  {% else %}
+    <input type="hidden" name="archived" value="true">
+    <button type="submit">Textbaustein archivieren</button>
+  {% endif %}
 </form>
 
 <section id="block-links" class="stack">

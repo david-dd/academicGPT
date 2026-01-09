@@ -192,7 +192,7 @@ def render_conversation_detail(
             "error": error,
             "relation_types": RELATION_TYPES,
             "relation_labels": RELATION_LABELS,
-            "project_blocks": project.text_blocks,
+            "project_blocks": crud.list_text_blocks(db, project_id=project.id),
             "highlight_query": highlight_query or "",
             "system_instruction": system_turn.content_text if system_turn else "",
             "available_models": available_models,
@@ -474,7 +474,7 @@ def list_blocks(
     db: Session = Depends(get_db),
 ):
     project = get_project_by_slug_or_404(db, project_slug)
-    blocks = list(project.text_blocks)
+    blocks = crud.list_text_blocks(db, project_id=project.id)
     selected_block = None
     if selected is not None:
         candidate = db.get(TextBlock, selected)
@@ -510,6 +510,59 @@ def list_blocks(
             "turn_counts": turn_counts,
             "link_relation": link_relation,
             "link_query": link_query,
+            "relation_types": RELATION_TYPES,
+            "relation_labels": RELATION_LABELS,
+            "project_conversations": project.conversations,
+        },
+    )
+
+
+@app.get("/p/{project_slug}/blocks/archived", response_class=HTMLResponse)
+def list_archived_blocks(
+    project_slug: str,
+    request: Request,
+    selected: int | None = None,
+    db: Session = Depends(get_db),
+):
+    project = get_project_by_slug_or_404(db, project_slug)
+    blocks = crud.list_archived_text_blocks(db, project_id=project.id)
+    selected_block = None
+    if selected is not None:
+        candidate = db.get(TextBlock, selected)
+        if candidate and candidate.project_id == project.id and candidate.archived:
+            selected_block = candidate
+    if not selected_block and blocks:
+        selected_block = blocks[0]
+    link_relation = "all"
+    link_query = ""
+    filtered_links = (
+        filter_links(
+            selected_block.links,
+            link_relation,
+            link_query,
+            db=db,
+            project_id=project.id,
+        )
+        if selected_block
+        else []
+    )
+    conversation_ids = [link.conversation.id for link in filtered_links]
+    turn_counts = crud.get_turn_counts_for_conversations(db, conversation_ids)
+    projects = crud.list_projects(db)
+    return templates.TemplateResponse(
+        "text_blocks/archived.html",
+        {
+            "request": request,
+            "project": project,
+            "projects": projects,
+            "blocks": blocks,
+            "selected_block": selected_block,
+            "links": filtered_links,
+            "turn_counts": turn_counts,
+            "link_relation": link_relation,
+            "link_query": link_query,
+            "search_highlights": [],
+            "highlight_query": "",
             "relation_types": RELATION_TYPES,
             "relation_labels": RELATION_LABELS,
             "project_conversations": project.conversations,
@@ -567,7 +620,7 @@ def block_detail(
     }
     if request.headers.get("HX-Request"):
         return templates.TemplateResponse("text_blocks/detail.html", context)
-    blocks = list(project.text_blocks)
+    blocks = crud.list_text_blocks(db, project_id=project.id)
     projects = crud.list_projects(db)
     context.update(
         {
@@ -612,6 +665,28 @@ def update_block(
             db=db,
         )
     return RedirectResponse(url=f"/p/{project.slug}/blocks?selected={block.id}", status_code=303)
+
+
+@app.post("/p/{project_slug}/blocks/{block_id}/archive")
+def archive_block(
+    project_slug: str,
+    block_id: int,
+    request: Request,
+    archived: bool = Form(...),
+    db: Session = Depends(get_db),
+):
+    project = get_project_by_slug_or_404(db, project_slug)
+    block = get_block_or_404(db, project, block_id)
+    crud.set_text_block_archived(db, block=block, archived=archived)
+    redirect_target = (
+        f"/p/{project.slug}/blocks/archived?selected={block.id}"
+        if archived
+        else f"/p/{project.slug}/blocks?selected={block.id}"
+    )
+    response = RedirectResponse(url=redirect_target, status_code=303)
+    if request.headers.get("HX-Request"):
+        response.headers["HX-Redirect"] = redirect_target
+    return response
 
 
 @app.get("/p/{project_slug}/blocks/{block_id}/links", response_class=HTMLResponse)
@@ -1019,10 +1094,16 @@ def search_results(
 
 
 @app.get("/p/{project_slug}/export")
-def export_project(project_slug: str, db: Session = Depends(get_db)):
+def export_project(
+    project_slug: str,
+    include_archived: bool = False,
+    db: Session = Depends(get_db),
+):
     project = get_project_by_slug_or_404(db, project_slug)
 
-    rows = crud.list_turns_for_project(db, project_id=project.id)
+    rows = crud.list_turns_for_project(
+        db, project_id=project.id, include_archived=include_archived
+    )
 
     def generate():
         for row in rows:

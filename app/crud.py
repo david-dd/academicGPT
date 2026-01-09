@@ -200,6 +200,31 @@ def update_text_block(
     return block
 
 
+def set_text_block_archived(db: Session, block: TextBlock, archived: bool) -> TextBlock:
+    block.archived = archived
+    db.commit()
+    db.refresh(block)
+    return block
+
+
+def list_text_blocks(
+    db: Session, project_id: int, include_archived: bool = False
+) -> list[TextBlock]:
+    stmt = select(TextBlock).where(TextBlock.project_id == project_id)
+    if not include_archived:
+        stmt = stmt.where(TextBlock.archived.is_(False))
+    return db.scalars(stmt.order_by(TextBlock.created_at.desc(), TextBlock.id.desc())).all()
+
+
+def list_archived_text_blocks(db: Session, project_id: int) -> list[TextBlock]:
+    stmt = (
+        select(TextBlock)
+        .where(TextBlock.project_id == project_id, TextBlock.archived.is_(True))
+        .order_by(TextBlock.created_at.desc(), TextBlock.id.desc())
+    )
+    return db.scalars(stmt).all()
+
+
 def create_conversation(
     db: Session,
     project: Project,
@@ -236,7 +261,9 @@ def update_conversation(
     return conversation
 
 
-def list_text_blocks_overview(db: Session, project_id: int) -> list[dict]:
+def list_text_blocks_overview(
+    db: Session, project_id: int, include_archived: bool = False
+) -> list[dict]:
     stmt = (
         select(
             TextBlock,
@@ -249,6 +276,8 @@ def list_text_blocks_overview(db: Session, project_id: int) -> list[dict]:
         .group_by(TextBlock.id)
         .order_by(TextBlock.created_at.desc(), TextBlock.id.desc())
     )
+    if not include_archived:
+        stmt = stmt.where(TextBlock.archived.is_(False))
     rows = db.execute(stmt).all()
     return [
         {
@@ -472,7 +501,9 @@ def search_text_blocks_for_project_snippets(
                    AS working_snippet
         FROM text_blocks_fts
         JOIN text_blocks ON text_blocks.id = text_blocks_fts.text_block_id
-        WHERE text_blocks_fts MATCH :query AND text_blocks_fts.project_id = :project_id
+        WHERE text_blocks_fts MATCH :query
+          AND text_blocks_fts.project_id = :project_id
+          AND text_blocks.archived = 0
         ORDER BY bm25(text_blocks_fts)
         LIMIT :limit
     """
@@ -482,10 +513,15 @@ def search_text_blocks_for_project_snippets(
     return list(rows)
 
 
-def list_turns_for_project(db: Session, project_id: int) -> list[dict]:
+def list_turns_for_project(
+    db: Session, project_id: int, include_archived: bool = False
+) -> list[dict]:
+    text_block_join = "LEFT JOIN text_blocks ON text_blocks.id = links.text_block_id"
+    if not include_archived:
+        text_block_join += " AND text_blocks.archived = 0"
     rows = db.execute(
         text(
-            """
+            f"""
             SELECT turns.id AS turn_id,
                    turns.role AS role,
                    turns.content_text AS content_text,
@@ -498,7 +534,7 @@ def list_turns_for_project(db: Session, project_id: int) -> list[dict]:
             JOIN conversations ON conversations.id = turns.conversation_id
             JOIN projects ON projects.id = conversations.project_id
             LEFT JOIN links ON links.conversation_id = conversations.id
-            LEFT JOIN text_blocks ON text_blocks.id = links.text_block_id
+            {text_block_join}
             WHERE projects.id = :project_id
             GROUP BY turns.id
             ORDER BY turns.timestamp DESC
@@ -511,7 +547,9 @@ def list_turns_for_project(db: Session, project_id: int) -> list[dict]:
 
 def get_project_stats(db: Session, project_id: int) -> dict:
     text_blocks = db.scalar(
-        select(func.count(TextBlock.id)).where(TextBlock.project_id == project_id)
+        select(func.count(TextBlock.id)).where(
+            TextBlock.project_id == project_id, TextBlock.archived.is_(False)
+        )
     )
     conversations = db.scalar(
         select(func.count(Conversation.id)).where(Conversation.project_id == project_id)

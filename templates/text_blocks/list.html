@@ -1,6 +1,11 @@
 <div class="tab-header">
-  <h3>Alle Textbausteine</h3>
-  <p class="muted">Links auswählen, um Details rechts zu laden.</p>
+  <div class="split">
+    <div>
+      <h3>Alle Textbausteine</h3>
+      <p class="muted">Links auswählen, um Details rechts zu laden.</p>
+    </div>
+    <a href="/p/{{ project.slug }}/blocks/archived">Archivierte anzeigen</a>
+  </div>
 </div>
 
 <form method="post" action="/p/{{ project.slug }}/blocks" class="form-grid">

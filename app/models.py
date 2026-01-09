@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text
 from sqlalchemy.dialects.sqlite import JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -55,6 +55,7 @@ class TextBlock(Base):
     title: Mapped[str] = mapped_column(String(200))
     type: Mapped[str] = mapped_column(String(50))
     status: Mapped[str] = mapped_column(String(50))
+    archived: Mapped[bool] = mapped_column(Boolean, default=False)
     notes: Mapped[str | None] = mapped_column(Text)
     working_text: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
