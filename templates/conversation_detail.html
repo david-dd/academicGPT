@@ -10,100 +10,110 @@
       <a href="/p/{{ project.slug }}/conversations">All conversations</a>
     </div>
   </div>
-  <div class="context-panel">
-    <div>
-      <h3>Aktueller Kontext</h3>
-      <p class="muted">
-        Konversation ID: <strong>{{ conversation.id }}</strong>
-      </p>
-      <p class="muted">
-        Beschreibung: {{ conversation.notes or "Keine Beschreibung vorhanden." }}
-      </p>
+  <details class="context-details">
+    <summary>
+      <span>Kontext &amp; Metadaten</span>
+      <span class="muted">
+        ID {{ conversation.id }} ·
+        {{ conversation.notes or "Keine Beschreibung" }} ·
+        {{ conversation.links | length }} Textbausteine
+      </span>
+    </summary>
+    <div class="context-panel">
+      <div>
+        <h3>Aktueller Kontext</h3>
+        <p class="muted">
+          Konversation ID: <strong>{{ conversation.id }}</strong>
+        </p>
+        <p class="muted">
+          Beschreibung: {{ conversation.notes or "Keine Beschreibung vorhanden." }}
+        </p>
+      </div>
+      <div>
+        <h4>Textbausteine</h4>
+        {% if conversation.links %}
+          <ul class="list compact-list">
+            {% for link in conversation.links %}
+              <li class="list-item">
+                <strong>#{{ link.text_block.id }} · {{ link.text_block.title }}</strong>
+                <p class="muted">Relation: {{ relation_labels[link.relation] }}</p>
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="muted">Noch keine Textbausteine verknüpft.</p>
+        {% endif %}
+      </div>
     </div>
-    <div>
-      <h4>Textbausteine</h4>
-      {% if conversation.links %}
-        <ul class="list compact-list">
-          {% for link in conversation.links %}
-            <li class="list-item">
-              <strong>#{{ link.text_block.id }} · {{ link.text_block.title }}</strong>
-              <p class="muted">Relation: {{ relation_labels[link.relation] }}</p>
-            </li>
-          {% endfor %}
-        </ul>
-      {% else %}
-        <p class="muted">Noch keine Textbausteine verknüpft.</p>
-      {% endif %}
-    </div>
-  </div>
-  <form method="post" action="/p/{{ project.slug }}/conversations/{{ conversation.id }}/meta" class="form-grid">
-    <label>
-      Titel
-      <input type="text" name="title" value="{{ conversation.title }}" required>
-    </label>
-    <label>
-      Beschreibung / Notiz
-      <textarea name="notes" rows="3">{{ conversation.notes or "" }}</textarea>
-    </label>
-    <button type="submit">Metadaten speichern</button>
-  </form>
+    <form method="post" action="/p/{{ project.slug }}/conversations/{{ conversation.id }}/meta" class="form-grid">
+      <label>
+        Titel
+        <input type="text" name="title" value="{{ conversation.title }}" required>
+      </label>
+      <label>
+        Beschreibung / Notiz
+        <textarea name="notes" rows="3">{{ conversation.notes or "" }}</textarea>
+      </label>
+      <button type="submit">Metadaten speichern</button>
+    </form>
+  </details>
 </section>
 
 <section class="card">
-  <div class="split">
-    <div>
-      <h3>Verknüpfte Textbausteine</h3>
-      <p class="muted">Ideation markiert Beiträge, die nicht übernommen wurden.</p>
-    </div>
-  </div>
-  {% if project_blocks %}
-    <form method="post" action="/p/{{ project.slug }}/conversations/{{ conversation.id }}/links" class="form-grid">
-      <label>
-        Textbaustein auswählen
-        <select name="block_id" required>
-          {% for block in project_blocks %}
-            <option value="{{ block.id }}">{{ block.title }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <label>
-        Relation
-        <select name="relation" required>
-          {% for relation in relation_types %}
-            <option value="{{ relation }}">{{ relation_labels[relation] }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <button type="submit">Verknüpfung hinzufügen</button>
-    </form>
-  {% else %}
-    <p class="muted">Keine Textbausteine vorhanden, um diese Konversation zuzuordnen.</p>
-  {% endif %}
-  {% if conversation.links %}
-    <ul class="list">
-      {% for link in conversation.links %}
-        <li class="list-item">
-          <div>
-            <strong>{{ link.text_block.title }}</strong>
-            <p class="muted">Relation: {{ relation_labels[link.relation] }}</p>
-            <a href="/p/{{ project.slug }}/blocks/{{ link.text_block.id }}">Zum Textbaustein</a>
-          </div>
-          <form method="post" action="/p/{{ project.slug }}/conversations/{{ conversation.id }}/links/{{ link.id }}" class="form-inline">
-            <select name="relation">
-              {% for relation in relation_types %}
-                <option value="{{ relation }}" {% if link.relation == relation %}selected{% endif %}>
-                  {{ relation_labels[relation] }}
-                </option>
-              {% endfor %}
-            </select>
-            <button type="submit">Aktualisieren</button>
-          </form>
-        </li>
-      {% endfor %}
-    </ul>
-  {% else %}
-    <p class="muted">Noch keine Textbausteine verknüpft.</p>
-  {% endif %}
+  <details class="section-details">
+    <summary>
+      <span>Verknüpfte Textbausteine</span>
+      <span class="muted">Ideation markiert Beiträge, die nicht übernommen wurden.</span>
+    </summary>
+    {% if project_blocks %}
+      <form method="post" action="/p/{{ project.slug }}/conversations/{{ conversation.id }}/links" class="form-grid">
+        <label>
+          Textbaustein auswählen
+          <select name="block_id" required>
+            {% for block in project_blocks %}
+              <option value="{{ block.id }}">{{ block.title }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>
+          Relation
+          <select name="relation" required>
+            {% for relation in relation_types %}
+              <option value="{{ relation }}">{{ relation_labels[relation] }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <button type="submit">Verknüpfung hinzufügen</button>
+      </form>
+    {% else %}
+      <p class="muted">Keine Textbausteine vorhanden, um diese Konversation zuzuordnen.</p>
+    {% endif %}
+    {% if conversation.links %}
+      <ul class="list">
+        {% for link in conversation.links %}
+          <li class="list-item">
+            <div>
+              <strong>{{ link.text_block.title }}</strong>
+              <p class="muted">Relation: {{ relation_labels[link.relation] }}</p>
+              <a href="/p/{{ project.slug }}/blocks/{{ link.text_block.id }}">Zum Textbaustein</a>
+            </div>
+            <form method="post" action="/p/{{ project.slug }}/conversations/{{ conversation.id }}/links/{{ link.id }}" class="form-inline">
+              <select name="relation">
+                {% for relation in relation_types %}
+                  <option value="{{ relation }}" {% if link.relation == relation %}selected{% endif %}>
+                    {{ relation_labels[relation] }}
+                  </option>
+                {% endfor %}
+              </select>
+              <button type="submit">Aktualisieren</button>
+            </form>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="muted">Noch keine Textbausteine verknüpft.</p>
+    {% endif %}
+  </details>
 </section>
 
 <section class="card">

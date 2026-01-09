@@ -483,6 +483,26 @@ mark {
   border: 1px solid #e2e8f0;
 }
 
+.context-details,
+.section-details {
+  margin: 1rem 0;
+}
+
+.context-details > summary,
+.section-details > summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: baseline;
+  cursor: pointer;
+  list-style: none;
+}
+
+.context-details > summary::-webkit-details-marker,
+.section-details > summary::-webkit-details-marker {
+  display: none;
+}
+
 .compact-list {
   margin: 0.5rem 0 0;
 }
