@@ -101,7 +101,7 @@
           <div class="chat-meta">
             <span class="pill">{{ turn.role }}</span>
             <span class="pill pill-muted">Model: {{ turn.model }}</span>
-            <span class="muted">{{ turn.timestamp.strftime('%Y-%m-%d %H:%M') }}</span>
+            <span class="muted">{{ turn.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</span>
           </div>
           <p>{{ turn.content_html }}</p>
         </li>
@@ -134,10 +134,18 @@
     </label>
     <label>
       Message
-      <textarea name="message" rows="8" class="message-textarea" required></textarea>
+      <div class="composer">
+        <textarea name="message" rows="6" class="message-textarea" required data-message-input></textarea>
+        <div class="composer-actions">
+          <span class="muted composer-count" data-message-count>0 Zeichen</span>
+          <button type="submit" class="composer-send">Send</button>
+        </div>
+      </div>
     </label>
-    <button type="submit">Send</button>
   </form>
+  <div class="progress" data-progress hidden>
+    <div class="progress-bar" role="progressbar" aria-label="Message processing"></div>
+  </div>
   <p id="message-status" class="status-message{% if error %} status-error{% endif %}" aria-live="polite">
     {% if error %}
       Fehler beim Senden – bitte prüfen Sie die Meldung oben.
@@ -149,6 +157,18 @@
 <script>
   const messageForm = document.querySelector("[data-message-form]");
   const messageStatus = document.getElementById("message-status");
+  const progressBar = document.querySelector("[data-progress]");
+  const messageInput = document.querySelector("[data-message-input]");
+  const messageCount = document.querySelector("[data-message-count]");
+  const updateCount = () => {
+    if (messageInput && messageCount) {
+      messageCount.textContent = `${messageInput.value.length} Zeichen`;
+    }
+  };
+  updateCount();
+  if (messageInput) {
+    messageInput.addEventListener("input", updateCount);
+  }
   if (messageForm && messageStatus) {
     messageForm.addEventListener("submit", () => {
       messageStatus.textContent = "Nachricht wird gesendet …";
@@ -158,9 +178,11 @@
         submitButton.disabled = true;
         submitButton.textContent = "Wird gesendet …";
       }
-      const messageInput = messageForm.querySelector("textarea[name='message']");
       if (messageInput) {
         messageInput.setAttribute("readonly", "readonly");
+      }
+      if (progressBar) {
+        progressBar.hidden = false;
       }
     });
   }
