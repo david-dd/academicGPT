@@ -1233,7 +1233,9 @@ def export_project(
                 payload["text_block_links"] = []
             yield json.dumps(payload, ensure_ascii=False) + "\n"
 
-    headers = {"Content-Disposition": f"attachment; filename=project_{project.id}.jsonl"}
+    safe_name = slugify(project.name) if project.name else ""
+    filename = f"{safe_name or f'project_{project.id}'}.jsonl"
+    headers = {"Content-Disposition": f"attachment; filename={filename}"}
     return StreamingResponse(generate(), media_type="application/jsonl", headers=headers)
 
 
