@@ -15,7 +15,9 @@
   </aside>
   <section class="card tabs-detail" id="block-detail">
     {% if selected_block %}
-      {% include "text_blocks/detail.html" %}
+      {% with block=selected_block %}
+        {% include "text_blocks/detail.html" %}
+      {% endwith %}
     {% else %}
       <p class="muted">Noch keine Textbausteine vorhanden.</p>
     {% endif %}
