@@ -6,7 +6,7 @@ body {
 }
 
 .site-header {
-  background: #1f2933;
+  background: #052800;
   color: #fff;
   padding: 0rem 1rem;
   display: flex;
@@ -27,7 +27,7 @@ body {
 }
 
 .project-pill {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgb(255 255 255 / 50%);
   padding: 0.25rem 0.75rem;
   border-radius: 999px;
   font-size: 0.85rem;
@@ -471,7 +471,7 @@ mark {
   display: inline-flex;
   padding: 0.2rem 0.65rem;
   border-radius: 999px;
-  background: #c1c1c1;
+  background: #A4D06F;
   font-size: 0.8rem;
 }
 
@@ -559,7 +559,7 @@ mark {
 }
 
 .message-textarea {
-  min-height: 160px;
+  min-height: 80px;
   font-size: 1rem;
   line-height: 1.6;
   resize: vertical;
@@ -578,7 +578,7 @@ mark {
   border: none;
   padding: 0;
   background: transparent;
-  min-height: 140px;
+  min-height: 80px;
 }
 
 .composer textarea:focus {
