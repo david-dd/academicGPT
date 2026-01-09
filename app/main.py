@@ -30,6 +30,8 @@ RELATION_LABELS = {
     "ideation": "ideation (nicht übernommen)",
     "rejected": "rejected",
 }
+TEXT_BLOCK_TYPES = ["draft", "outline", "summary", "final"]
+TEXT_BLOCK_STATUSES = ["active", "review", "done", "paused"]
 
 
 def slugify(value: str) -> str:
@@ -76,6 +78,27 @@ def get_project_default_model(project: Project) -> str | None:
     if isinstance(model, str) and model.strip():
         return model.strip()
     return None
+
+
+def get_project_system_instruction(project: Project) -> str | None:
+    if not project.settings_json:
+        return None
+    system_instruction = project.settings_json.get("system_instruction")
+    if isinstance(system_instruction, str) and system_instruction.strip():
+        return system_instruction.strip()
+    return None
+
+
+def get_project_system_instruction_updated_at(project: Project) -> datetime | None:
+    if not project.settings_json:
+        return None
+    updated_at = project.settings_json.get("system_instruction_updated_at")
+    if not isinstance(updated_at, str) or not updated_at.strip():
+        return None
+    try:
+        return datetime.fromisoformat(updated_at)
+    except ValueError:
+        return None
 
 
 def list_available_models(project: Project) -> tuple[list[str], str | None]:
@@ -162,6 +185,21 @@ def render_conversation_detail(
 ):
     turns = crud.list_turns_for_conversation(db, conversation_id=conversation.id)
     system_turn = crud.get_initial_system_turn(db, conversation_id=conversation.id)
+    project_system_instruction = get_project_system_instruction(project)
+    project_system_instruction_updated_at = get_project_system_instruction_updated_at(project)
+    latest_sync_turn = None
+    for turn in turns:
+        if turn.metadata_json and turn.metadata_json.get("event") == "system_instruction_sync":
+            latest_sync_turn = turn
+    latest_sync_at = latest_sync_turn.timestamp if latest_sync_turn else None
+    needs_system_instruction_sync = False
+    if project_system_instruction:
+        current_system_text = (system_turn.content_text or "").strip() if system_turn else ""
+        if current_system_text != project_system_instruction:
+            if not project_system_instruction_updated_at or not latest_sync_at:
+                needs_system_instruction_sync = True
+            elif latest_sync_at < project_system_instruction_updated_at:
+                needs_system_instruction_sync = True
     available_models, model_list_error = list_available_models(project)
     default_model = get_project_default_model(project)
     if not selected_model:
@@ -195,6 +233,8 @@ def render_conversation_detail(
             "project_blocks": crud.list_text_blocks(db, project_id=project.id),
             "highlight_query": highlight_query or "",
             "system_instruction": system_turn.content_text if system_turn else "",
+            "project_system_instruction": project_system_instruction,
+            "needs_system_instruction_sync": needs_system_instruction_sync,
             "available_models": available_models,
             "model_list_error": model_list_error,
             "selected_model": selected_model,
@@ -207,6 +247,7 @@ def render_project_settings(
     project: Project,
     db: Session,
     settings_payload: str,
+    system_instruction: str,
     error: str | None = None,
     test_result: str | None = None,
     test_status: str | None = None,
@@ -219,6 +260,7 @@ def render_project_settings(
             "project": project,
             "projects": projects,
             "settings_payload": settings_payload,
+            "system_instruction": system_instruction,
             "error": error,
             "test_result": test_result,
             "test_status": test_status,
@@ -384,12 +426,14 @@ def list_conversations(
     project_slug: str, request: Request, db: Session = Depends(get_db)
 ):
     project = get_project_by_slug_or_404(db, project_slug)
+    project_system_instruction = get_project_system_instruction(project)
     return templates.TemplateResponse(
         "conversations.html",
         {
             "request": request,
             "project": project,
             "conversations": project.conversations,
+            "project_system_instruction": project_system_instruction or "",
         },
     )
 
@@ -429,6 +473,8 @@ def create_project_conversation(
 def create_block(
     project_slug: str,
     title: str = Form(...),
+    block_type: str = Form("draft"),
+    status: str = Form("active"),
     notes: str | None = Form(None),
     db: Session = Depends(get_db),
 ):
@@ -438,8 +484,8 @@ def create_block(
         project=project,
         tb_id=f"TB-{project.id}-{title[:3].upper()}",
         title=title,
-        block_type="draft",
-        status="active",
+        block_type=block_type,
+        status=status,
         notes=notes,
         working_text=None,
     )
@@ -462,6 +508,10 @@ def new_block(
             "request": request,
             "project": project,
             "projects": projects,
+            "block_types": TEXT_BLOCK_TYPES,
+            "block_statuses": TEXT_BLOCK_STATUSES,
+            "default_block_type": TEXT_BLOCK_TYPES[0],
+            "default_block_status": TEXT_BLOCK_STATUSES[0],
         },
     )
 
@@ -513,6 +563,8 @@ def list_blocks(
             "relation_types": RELATION_TYPES,
             "relation_labels": RELATION_LABELS,
             "project_conversations": project.conversations,
+            "block_types": TEXT_BLOCK_TYPES,
+            "block_statuses": TEXT_BLOCK_STATUSES,
         },
     )
 
@@ -566,6 +618,8 @@ def list_archived_blocks(
             "relation_types": RELATION_TYPES,
             "relation_labels": RELATION_LABELS,
             "project_conversations": project.conversations,
+            "block_types": TEXT_BLOCK_TYPES,
+            "block_statuses": TEXT_BLOCK_STATUSES,
         },
     )
 
@@ -617,6 +671,8 @@ def block_detail(
         "project_conversations": project.conversations,
         "search_highlights": search_highlights,
         "highlight_query": q or "",
+        "block_types": TEXT_BLOCK_TYPES,
+        "block_statuses": TEXT_BLOCK_STATUSES,
     }
     if request.headers.get("HX-Request"):
         return templates.TemplateResponse("text_blocks/detail.html", context)
@@ -722,6 +778,8 @@ def block_links(
         "relation_types": RELATION_TYPES,
         "relation_labels": RELATION_LABELS,
         "project_conversations": project.conversations,
+        "block_types": TEXT_BLOCK_TYPES,
+        "block_statuses": TEXT_BLOCK_STATUSES,
     }
     if request.headers.get("HX-Request"):
         return templates.TemplateResponse("text_blocks/links.html", context)
@@ -1049,6 +1107,49 @@ def update_conversation_system_instruction(
     )
 
 
+@app.post("/p/{project_slug}/conversations/{conversation_id}/system/sync")
+def sync_conversation_system_instruction(
+    project_slug: str,
+    conversation_id: int,
+    decision: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    project = get_project_by_slug_or_404(db, project_slug)
+    conversation = get_conversation_or_404(db, project, conversation_id)
+    project_system_instruction = get_project_system_instruction(project)
+    if not project_system_instruction:
+        return RedirectResponse(
+            url=f"/p/{project.slug}/conversations/{conversation.id}", status_code=303
+        )
+    if decision == "update":
+        crud.upsert_system_turn(
+            db, conversation=conversation, content_text=project_system_instruction
+        )
+        message = "System-Instruktion auf Projektstandard aktualisiert."
+    else:
+        message = "System-Instruktion für diesen Chat beibehalten."
+    project_system_instruction_updated_at = get_project_system_instruction_updated_at(project)
+    crud.create_turn(
+        db,
+        conversation=conversation,
+        role="event",
+        content_text=message,
+        model="system",
+        metadata_json={
+            "event": "system_instruction_sync",
+            "decision": decision,
+            "project_system_instruction_updated_at": (
+                project_system_instruction_updated_at.isoformat()
+                if project_system_instruction_updated_at
+                else None
+            ),
+        },
+    )
+    return RedirectResponse(
+        url=f"/p/{project.slug}/conversations/{conversation.id}", status_code=303
+    )
+
+
 @app.get("/p/{project_slug}/search", response_class=HTMLResponse)
 def search(
     project_slug: str,
@@ -1125,11 +1226,13 @@ def export_project(
 def project_settings(project_slug: str, request: Request, db: Session = Depends(get_db)):
     project = get_project_by_slug_or_404(db, project_slug)
     settings_payload = json.dumps(project.settings_json, indent=2) if project.settings_json else ""
+    system_instruction = get_project_system_instruction(project) or ""
     return render_project_settings(
         request=request,
         project=project,
         db=db,
         settings_payload=settings_payload,
+        system_instruction=system_instruction,
         error=None,
         test_result=None,
         test_status=None,
@@ -1143,12 +1246,13 @@ def update_project_settings(
     name: str = Form(...),
     description: str | None = Form(None),
     settings_payload: str | None = Form(None),
+    system_instruction: str | None = Form(None),
     api_key: str | None = Form(None),
     db: Session = Depends(get_db),
 ):
     project = get_project_by_slug_or_404(db, project_slug)
     parsed_settings: dict | None = None
-    if settings_payload:
+    if settings_payload and settings_payload.strip():
         try:
             parsed_settings = json.loads(settings_payload)
         except json.JSONDecodeError as exc:
@@ -1157,16 +1261,35 @@ def update_project_settings(
                 project=project,
                 db=db,
                 settings_payload=settings_payload,
+                system_instruction=system_instruction or "",
                 error=f"Invalid JSON: {exc.msg}",
                 test_result=None,
                 test_status=None,
             )
+    if parsed_settings is None:
+        parsed_settings = dict(project.settings_json or {})
+    if system_instruction is not None:
+        new_system_instruction = system_instruction.strip()
+    else:
+        new_system_instruction = ""
+    old_system_instruction = (
+        parsed_settings.get("system_instruction")
+        if isinstance(parsed_settings.get("system_instruction"), str)
+        else ""
+    )
+    if new_system_instruction:
+        parsed_settings["system_instruction"] = new_system_instruction
+    else:
+        parsed_settings.pop("system_instruction", None)
+    if old_system_instruction.strip() != new_system_instruction:
+        parsed_settings["system_instruction_updated_at"] = datetime.utcnow().isoformat()
     if name != project.name and crud.project_name_exists(db, name):
         return render_project_settings(
             request=request,
             project=project,
             db=db,
-            settings_payload=settings_payload or "",
+            settings_payload=settings_payload or json.dumps(parsed_settings, indent=2),
+            system_instruction=new_system_instruction,
             error="Project name already exists.",
             test_result=None,
             test_status=None,
@@ -1180,7 +1303,7 @@ def update_project_settings(
         name=name,
         slug=slug,
         description=description,
-        settings_json=parsed_settings,
+        settings_json=parsed_settings or None,
     )
     if api_key:
         try:
@@ -1190,7 +1313,8 @@ def update_project_settings(
                 request=request,
                 project=project,
                 db=db,
-                settings_payload=settings_payload or "",
+                settings_payload=settings_payload or json.dumps(parsed_settings, indent=2),
+                system_instruction=new_system_instruction,
                 error=str(exc),
                 test_result=None,
                 test_status=None,
@@ -1210,6 +1334,7 @@ def test_project_settings_api_key(
 ):
     project = get_project_by_slug_or_404(db, project_slug)
     settings_payload = json.dumps(project.settings_json, indent=2) if project.settings_json else ""
+    system_instruction = get_project_system_instruction(project) or ""
     try:
         api_key = get_project_openai_key(project)
         client = get_openai_client(api_key)
@@ -1220,6 +1345,7 @@ def test_project_settings_api_key(
             project=project,
             db=db,
             settings_payload=settings_payload,
+            system_instruction=system_instruction,
             error=None,
             test_result=str(exc.detail),
             test_status="error",
@@ -1230,6 +1356,7 @@ def test_project_settings_api_key(
             project=project,
             db=db,
             settings_payload=settings_payload,
+            system_instruction=system_instruction,
             error=None,
             test_result="Authentication failed. Please check the project API key.",
             test_status="error",
@@ -1240,6 +1367,7 @@ def test_project_settings_api_key(
             project=project,
             db=db,
             settings_payload=settings_payload,
+            system_instruction=system_instruction,
             error=None,
             test_result="Rate limit reached. Please wait and try again.",
             test_status="error",
@@ -1250,6 +1378,7 @@ def test_project_settings_api_key(
             project=project,
             db=db,
             settings_payload=settings_payload,
+            system_instruction=system_instruction,
             error=None,
             test_result=f"API error: {exc.status_code} {exc.message}",
             test_status="error",
@@ -1260,6 +1389,7 @@ def test_project_settings_api_key(
             project=project,
             db=db,
             settings_payload=settings_payload,
+            system_instruction=system_instruction,
             error=None,
             test_result=f"API error: {exc}",
             test_status="error",
@@ -1269,6 +1399,7 @@ def test_project_settings_api_key(
         project=project,
         db=db,
         settings_payload=settings_payload,
+        system_instruction=system_instruction,
         error=None,
         test_result="API key verified. OpenAI connection looks good.",
         test_status="success",

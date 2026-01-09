@@ -155,6 +155,15 @@ button:hover {
   background: #1d4ed8;
 }
 
+.button-secondary {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.button-secondary:hover {
+  background: #cbd5f5;
+}
+
 .button-link {
   display: inline-flex;
   align-items: center;
@@ -359,6 +368,13 @@ button:hover {
   border-bottom-left-radius: 4px;
 }
 
+.chat-turn-event {
+  background: #f1f5f9;
+  border-color: #cbd5f5;
+  align-self: center;
+  max-width: 80%;
+}
+
 .chat-turn-match {
   border-color: #f59e0b;
   box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25);
@@ -560,6 +576,12 @@ mark {
   color: #b91c1c;
   padding: 0.75rem 1rem;
   border-radius: 8px;
+}
+
+.alert-warning {
+  background: #fffbeb;
+  color: #92400e;
+  border: 1px solid #fde68a;
 }
 
 .alert-success {

@@ -59,11 +59,25 @@
   <div class="form-inline">
     <label class="grow">
       Typ
-      <input type="text" name="block_type" value="{{ block.type }}" required>
+      <select name="block_type" required>
+        {% if block.type and block.type not in block_types %}
+          <option value="{{ block.type }}" selected>{{ block.type }}</option>
+        {% endif %}
+        {% for option in block_types %}
+          <option value="{{ option }}" {% if option == block.type %}selected{% endif %}>{{ option }}</option>
+        {% endfor %}
+      </select>
     </label>
     <label class="grow">
       Status
-      <input type="text" name="status" value="{{ block.status }}" required>
+      <select name="status" required>
+        {% if block.status and block.status not in block_statuses %}
+          <option value="{{ block.status }}" selected>{{ block.status }}</option>
+        {% endif %}
+        {% for option in block_statuses %}
+          <option value="{{ option }}" {% if option == block.status %}selected{% endif %}>{{ option }}</option>
+        {% endfor %}
+      </select>
     </label>
   </div>
   <label>

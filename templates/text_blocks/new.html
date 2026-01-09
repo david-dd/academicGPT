@@ -16,6 +16,24 @@
       Title
       <input type="text" name="title" required>
     </label>
+    <div class="form-inline">
+      <label class="grow">
+        Typ
+        <select name="block_type" required>
+          {% for option in block_types %}
+            <option value="{{ option }}" {% if option == default_block_type %}selected{% endif %}>{{ option }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="grow">
+        Status
+        <select name="status" required>
+          {% for option in block_statuses %}
+            <option value="{{ option }}" {% if option == default_block_status %}selected{% endif %}>{{ option }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
     <label>
       Notes
       <textarea name="notes" rows="4"></textarea>
