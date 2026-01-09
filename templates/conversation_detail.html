@@ -74,6 +74,9 @@
   {% if error %}
     <p class="error">{{ error }}</p>
   {% endif %}
+  {% if model_list_error %}
+    <p class="error">{{ model_list_error }}</p>
+  {% endif %}
   <form method="post" action="/p/{{ project.slug }}/conversations/{{ conversation.id }}/system" class="form-grid chat-config">
     <label>
       System-Instruktion
@@ -117,6 +120,18 @@
     class="form-grid message-form"
     data-message-form
   >
+    <label>
+      Modell auswählen
+      <select name="model" required>
+        {% if available_models %}
+          {% for model in available_models %}
+            <option value="{{ model }}" {% if model == selected_model %}selected{% endif %}>{{ model }}</option>
+          {% endfor %}
+        {% else %}
+          <option value="{{ selected_model }}">{{ selected_model }}</option>
+        {% endif %}
+      </select>
+    </label>
     <label>
       Message
       <textarea name="message" rows="8" class="message-textarea" required></textarea>

@@ -69,6 +69,43 @@ def get_project_openai_key(project: Project) -> str:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+def get_project_default_model(project: Project) -> str | None:
+    if not project.settings_json:
+        return None
+    model = project.settings_json.get("model")
+    if isinstance(model, str) and model.strip():
+        return model.strip()
+    return None
+
+
+def list_available_models(project: Project) -> tuple[list[str], str | None]:
+    try:
+        api_key = get_project_openai_key(project)
+    except HTTPException as exc:
+        return [], str(exc.detail)
+    client = get_openai_client(api_key)
+    try:
+        response = client.models.list()
+    except AuthenticationError:
+        return [], "Authentication failed. Please check the project API key."
+    except RateLimitError:
+        return [], "Rate limit reached. Please wait and try again."
+    except APIStatusError as exc:
+        return [], f"API error: {exc.status_code} {exc.message}"
+    except OpenAIError as exc:
+        return [], f"API error: {exc}"
+    data = getattr(response, "data", response)
+    model_ids = []
+    for item in data or []:
+        model_id = getattr(item, "id", None)
+        if not model_id and isinstance(item, dict):
+            model_id = item.get("id")
+        if model_id:
+            model_ids.append(model_id)
+    model_ids = sorted(set(model_ids))
+    return model_ids, None
+
+
 def serialize_usage(usage) -> dict | None:
     if usage is None:
         return None
@@ -121,9 +158,14 @@ def render_conversation_detail(
     db: Session,
     error: str | None = None,
     highlight_query: str | None = None,
+    selected_model: str | None = None,
 ):
     turns = crud.list_turns_for_conversation(db, conversation_id=conversation.id)
     system_turn = crud.get_initial_system_turn(db, conversation_id=conversation.id)
+    available_models, model_list_error = list_available_models(project)
+    default_model = get_project_default_model(project)
+    if not selected_model:
+        selected_model = default_model or (available_models[0] if available_models else "gpt-4o-mini")
     highlight_terms = extract_query_terms(highlight_query)
     highlight_pattern = build_highlight_pattern(highlight_terms)
     rendered_turns = []
@@ -153,6 +195,9 @@ def render_conversation_detail(
             "project_blocks": project.text_blocks,
             "highlight_query": highlight_query or "",
             "system_instruction": system_turn.content_text if system_turn else "",
+            "available_models": available_models,
+            "model_list_error": model_list_error,
+            "selected_model": selected_model,
         },
     )
 
@@ -724,10 +769,15 @@ def create_conversation_message(
     conversation_id: int,
     request: Request,
     message: str = Form(...),
+    model: str | None = Form(None),
     db: Session = Depends(get_db),
 ):
     project = get_project_by_slug_or_404(db, project_slug)
     conversation = get_conversation_or_404(db, project, conversation_id)
+    default_model = get_project_default_model(project) or "gpt-4o-mini"
+    selected_model = (model or default_model).strip()
+    if not selected_model:
+        selected_model = default_model
     if not message.strip():
         return render_conversation_detail(
             request,
@@ -735,6 +785,7 @@ def create_conversation_message(
             conversation,
             db,
             error="Message cannot be empty.",
+            selected_model=selected_model,
         )
 
     try:
@@ -746,6 +797,7 @@ def create_conversation_message(
             conversation,
             db,
             error=str(exc.detail),
+            selected_model=selected_model,
         )
     client = get_openai_client(api_key)
     previous_response_id = crud.get_latest_response_id(db, conversation_id=conversation.id)
@@ -764,7 +816,7 @@ def create_conversation_message(
     # We use previous_response_id to keep conversation state on the OpenAI side.
     try:
         api_response = client.responses.create(
-            model="gpt-4o-mini",
+            model=selected_model,
             input=input_messages,
             previous_response_id=previous_response_id,
         )
@@ -775,6 +827,7 @@ def create_conversation_message(
             conversation,
             db,
             error="Rate limit reached. Please wait and try again.",
+            selected_model=selected_model,
         )
     except AuthenticationError:
         return render_conversation_detail(
@@ -783,6 +836,7 @@ def create_conversation_message(
             conversation,
             db,
             error="Authentication failed. Please check the project API key.",
+            selected_model=selected_model,
         )
     except APIStatusError as exc:
         return render_conversation_detail(
@@ -791,6 +845,7 @@ def create_conversation_message(
             conversation,
             db,
             error=f"OpenAI error: {exc.message}",
+            selected_model=selected_model,
         )
     except OpenAIError as exc:
         return render_conversation_detail(
@@ -799,6 +854,7 @@ def create_conversation_message(
             conversation,
             db,
             error=f"OpenAI error: {exc}",
+            selected_model=selected_model,
         )
 
     crud.create_turn(
@@ -806,7 +862,7 @@ def create_conversation_message(
         conversation=conversation,
         role="user",
         content_text=message,
-        model="user",
+        model=selected_model,
         timestamp=datetime.utcnow(),
         metadata_json={"input": input_messages},
     )
@@ -817,7 +873,7 @@ def create_conversation_message(
         "status": getattr(api_response, "status", None),
     }
     response_id = getattr(api_response, "id", None)
-    model = getattr(api_response, "model", None) or "gpt-4o-mini"
+    model = getattr(api_response, "model", None) or selected_model
     crud.create_turn(
         db,
         conversation=conversation,
