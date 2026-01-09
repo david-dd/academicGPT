@@ -12,6 +12,9 @@ from app.models import (
     Turn,
 )
 
+HIGHLIGHT_START = "[[[H]]]"
+HIGHLIGHT_END = "[[[/H]]]"
+
 
 def create_project(
     db: Session,
@@ -322,12 +325,60 @@ def search_turns_for_project(db: Session, project_id: int, query: str) -> list[d
     return list(rows)
 
 
+def search_turns_for_project_snippets(
+    db: Session, project_id: int, query: str, limit: int = 25
+) -> list[dict]:
+    sql = f"""
+        SELECT turns_fts.turn_id,
+               turns_fts.conversation_id,
+               turns_fts.project_id,
+               conversations.title AS conversation_title,
+               snippet(turns_fts, 1, '{HIGHLIGHT_START}', '{HIGHLIGHT_END}', '…', 12)
+                   AS snippet
+        FROM turns_fts
+        JOIN turns ON turns.id = turns_fts.turn_id
+        JOIN conversations ON conversations.id = turns_fts.conversation_id
+        WHERE turns_fts MATCH :query AND turns_fts.project_id = :project_id
+        ORDER BY bm25(turns_fts)
+        LIMIT :limit
+    """
+    rows = db.execute(
+        text(sql), {"query": query, "project_id": project_id, "limit": limit}
+    ).mappings().all()
+    return list(rows)
+
+
 def search_text_blocks(db: Session, query: str) -> list[dict]:
     sql = (
         "SELECT text_block_id, title, notes, working_text, project_id "
         "FROM text_blocks_fts WHERE text_blocks_fts MATCH :query"
     )
     rows = db.execute(text(sql), {"query": query}).mappings().all()
+    return list(rows)
+
+
+def search_text_blocks_for_project_snippets(
+    db: Session, project_id: int, query: str, limit: int = 25
+) -> list[dict]:
+    sql = f"""
+        SELECT text_blocks_fts.text_block_id,
+               text_blocks.title,
+               text_blocks_fts.project_id,
+               snippet(text_blocks_fts, 1, '{HIGHLIGHT_START}', '{HIGHLIGHT_END}', '…', 12)
+                   AS title_snippet,
+               snippet(text_blocks_fts, 2, '{HIGHLIGHT_START}', '{HIGHLIGHT_END}', '…', 12)
+                   AS notes_snippet,
+               snippet(text_blocks_fts, 3, '{HIGHLIGHT_START}', '{HIGHLIGHT_END}', '…', 12)
+                   AS working_snippet
+        FROM text_blocks_fts
+        JOIN text_blocks ON text_blocks.id = text_blocks_fts.text_block_id
+        WHERE text_blocks_fts MATCH :query AND text_blocks_fts.project_id = :project_id
+        ORDER BY bm25(text_blocks_fts)
+        LIMIT :limit
+    """
+    rows = db.execute(
+        text(sql), {"query": query, "project_id": project_id, "limit": limit}
+    ).mappings().all()
     return list(rows)
 
 

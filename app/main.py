@@ -1,4 +1,6 @@
+import html
 import json
+import re
 from datetime import datetime
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request
@@ -6,6 +8,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
+from markupsafe import Markup
 
 from app import crud
 from app.db import get_db
@@ -76,25 +79,77 @@ def serialize_usage(usage) -> dict | None:
     return dict(usage)
 
 
+def extract_query_terms(query: str | None) -> list[str]:
+    if not query:
+        return []
+    return re.findall(r"[\wÀ-ÖØ-öø-ÿ]+", query, flags=re.UNICODE)
+
+
+def build_highlight_pattern(terms: list[str]) -> re.Pattern[str] | None:
+    unique_terms = sorted({term for term in terms if term}, key=len, reverse=True)
+    if not unique_terms:
+        return None
+    return re.compile(
+        r"(" + "|".join(re.escape(term) for term in unique_terms) + r")",
+        flags=re.IGNORECASE,
+    )
+
+
+def highlight_text(text: str | None, pattern: re.Pattern[str] | None) -> Markup:
+    if not text:
+        return Markup("")
+    escaped = html.escape(text)
+    if not pattern:
+        return Markup(escaped)
+    return Markup(pattern.sub(r"<mark>\1</mark>", escaped))
+
+
+def render_snippet(snippet: str | None) -> Markup:
+    if not snippet:
+        return Markup("")
+    escaped = html.escape(snippet)
+    escaped = escaped.replace(crud.HIGHLIGHT_START, "<mark>").replace(
+        crud.HIGHLIGHT_END, "</mark>"
+    )
+    return Markup(escaped)
+
+
 def render_conversation_detail(
     request: Request,
     project: Project,
     conversation: Conversation,
     db: Session,
     error: str | None = None,
+    highlight_query: str | None = None,
 ):
     turns = crud.list_turns_for_conversation(db, conversation_id=conversation.id)
+    highlight_terms = extract_query_terms(highlight_query)
+    highlight_pattern = build_highlight_pattern(highlight_terms)
+    rendered_turns = []
+    for turn in turns:
+        rendered_turns.append(
+            {
+                "id": turn.id,
+                "role": turn.role,
+                "timestamp": turn.timestamp,
+                "content_html": highlight_text(turn.content_text, highlight_pattern),
+                "is_match": bool(
+                    highlight_pattern and highlight_pattern.search(turn.content_text or "")
+                ),
+            }
+        )
     return templates.TemplateResponse(
         "conversation_detail.html",
         {
             "request": request,
             "project": project,
             "conversation": conversation,
-            "turns": turns,
+            "turns": rendered_turns,
             "error": error,
             "relation_types": RELATION_TYPES,
             "relation_labels": RELATION_LABELS,
             "project_blocks": project.text_blocks,
+            "highlight_query": highlight_query or "",
         },
     )
 
@@ -139,6 +194,51 @@ def build_unique_slug(db: Session, name: str) -> str:
         slug = f"{base_slug}-{counter}"
         counter += 1
     return slug
+
+
+def build_search_results(db: Session, project_id: int, query: str | None) -> dict:
+    if not query:
+        return {"turn_results": [], "text_block_results": []}
+    turn_rows = crud.search_turns_for_project_snippets(
+        db, project_id=project_id, query=query
+    )
+    text_block_rows = crud.search_text_blocks_for_project_snippets(
+        db, project_id=project_id, query=query
+    )
+
+    turn_results = []
+    for row in turn_rows:
+        turn_results.append(
+            {
+                "turn_id": row["turn_id"],
+                "conversation_id": row["conversation_id"],
+                "conversation_title": row["conversation_title"],
+                "snippet": render_snippet(row.get("snippet")),
+            }
+        )
+
+    text_block_results = []
+    for row in text_block_rows:
+        snippets = [
+            row.get("title_snippet"),
+            row.get("notes_snippet"),
+            row.get("working_snippet"),
+        ]
+        chosen_snippet = next(
+            (snippet for snippet in snippets if snippet and crud.HIGHLIGHT_START in snippet),
+            None,
+        )
+        if not chosen_snippet:
+            chosen_snippet = next((snippet for snippet in snippets if snippet), "")
+        text_block_results.append(
+            {
+                "text_block_id": row["text_block_id"],
+                "title": row["title"],
+                "snippet": render_snippet(chosen_snippet),
+            }
+        )
+
+    return {"turn_results": turn_results, "text_block_results": text_block_results}
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -336,6 +436,18 @@ def block_detail(
         db=db,
         project_id=project.id,
     )
+    highlight_terms = extract_query_terms(q)
+    highlight_pattern = build_highlight_pattern(highlight_terms)
+    search_highlights = []
+    for label, value in (
+        ("Titel", block.title),
+        ("Working-Text", block.working_text),
+        ("Notes", block.notes),
+    ):
+        if value and highlight_pattern and highlight_pattern.search(value):
+            search_highlights.append(
+                {"label": label, "content_html": highlight_text(value, highlight_pattern)}
+            )
     context = {
         "request": request,
         "project": project,
@@ -346,6 +458,8 @@ def block_detail(
         "relation_types": RELATION_TYPES,
         "relation_labels": RELATION_LABELS,
         "project_conversations": project.conversations,
+        "search_highlights": search_highlights,
+        "highlight_query": q or "",
     }
     if request.headers.get("HX-Request"):
         return templates.TemplateResponse("text_blocks/detail.html", context)
@@ -526,11 +640,14 @@ def conversation_detail(
     project_slug: str,
     conversation_id: int,
     request: Request,
+    q: str | None = None,
     db: Session = Depends(get_db),
 ):
     project = get_project_by_slug_or_404(db, project_slug)
     conversation = get_conversation_or_404(db, project, conversation_id)
-    return render_conversation_detail(request, project, conversation, db)
+    return render_conversation_detail(
+        request, project, conversation, db, highlight_query=q
+    )
 
 
 @app.post("/p/{project_slug}/conversations/{conversation_id}/links")
@@ -691,7 +808,7 @@ def search(
     db: Session = Depends(get_db),
 ):
     project = get_project_by_slug_or_404(db, project_slug)
-    results = crud.search_turns_for_project(db, project_id=project.id, query=q) if q else []
+    results = build_search_results(db, project_id=project.id, query=q)
     projects = crud.list_projects(db)
     return templates.TemplateResponse(
         "project_search.html",
@@ -699,7 +816,29 @@ def search(
             "request": request,
             "project": project,
             "projects": projects,
-            "results": results,
+            "turn_results": results["turn_results"],
+            "text_block_results": results["text_block_results"],
+            "query": q,
+        },
+    )
+
+
+@app.get("/p/{project_slug}/search/results", response_class=HTMLResponse)
+def search_results(
+    project_slug: str,
+    request: Request,
+    q: str | None = None,
+    db: Session = Depends(get_db),
+):
+    project = get_project_by_slug_or_404(db, project_slug)
+    results = build_search_results(db, project_id=project.id, query=q)
+    return templates.TemplateResponse(
+        "search/results.html",
+        {
+            "request": request,
+            "project": project,
+            "turn_results": results["turn_results"],
+            "text_block_results": results["text_block_results"],
             "query": q,
         },
     )

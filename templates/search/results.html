@@ -1,0 +1,49 @@
+{% if query %}
+  <section class="card">
+    <div class="split">
+      <h3>Textbausteine</h3>
+      <span class="pill">{{ text_block_results | length }} Treffer</span>
+    </div>
+    <ul class="list">
+      {% for result in text_block_results %}
+        <li class="list-item">
+          <div>
+            <strong>{{ result.title }}</strong>
+            {% if result.snippet %}
+              <p class="search-snippet">{{ result.snippet }}</p>
+            {% endif %}
+          </div>
+          <a href="/p/{{ project.slug }}/blocks/{{ result.text_block_id }}?q={{ query }}">Öffnen</a>
+        </li>
+      {% else %}
+        <li class="muted">Keine Textbausteine gefunden.</li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section class="card">
+    <div class="split">
+      <h3>Konversationen/Turns</h3>
+      <span class="pill">{{ turn_results | length }} Treffer</span>
+    </div>
+    <ul class="list">
+      {% for result in turn_results %}
+        <li class="list-item">
+          <div>
+            <strong>{{ result.conversation_title }}</strong>
+            {% if result.snippet %}
+              <p class="search-snippet">{{ result.snippet }}</p>
+            {% endif %}
+          </div>
+          <a href="/p/{{ project.slug }}/conversations/{{ result.conversation_id }}?q={{ query }}#turn-{{ result.turn_id }}">Öffnen</a>
+        </li>
+      {% else %}
+        <li class="muted">Keine Turns gefunden.</li>
+      {% endfor %}
+    </ul>
+  </section>
+{% else %}
+  <section class="card">
+    <p class="muted">Suchbegriff eingeben, um Ergebnisse zu sehen.</p>
+  </section>
+{% endif %}

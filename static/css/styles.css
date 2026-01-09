@@ -269,6 +269,28 @@ button:hover {
   border-color: #bbf7d0;
 }
 
+.chat-turn-match {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25);
+}
+
+.search-snippet {
+  margin: 0.35rem 0 0;
+  color: #475569;
+}
+
+.search-highlights .list li {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+mark {
+  background: #fde68a;
+  color: inherit;
+  padding: 0 0.1rem;
+  border-radius: 4px;
+}
+
 .chat-meta {
   display: flex;
   gap: 0.75rem;

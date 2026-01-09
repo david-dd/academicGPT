@@ -77,12 +77,15 @@
   {% if turns %}
     <ul class="chat-thread">
       {% for turn in turns %}
-        <li class="chat-turn chat-turn-{{ turn.role }}">
+        <li
+          id="turn-{{ turn.id }}"
+          class="chat-turn chat-turn-{{ turn.role }}{% if turn.is_match %} chat-turn-match{% endif %}"
+        >
           <div class="chat-meta">
             <span class="pill">{{ turn.role }}</span>
             <span class="muted">{{ turn.timestamp.strftime('%Y-%m-%d %H:%M') }}</span>
           </div>
-          <p>{{ turn.content_text }}</p>
+          <p>{{ turn.content_html }}</p>
         </li>
       {% endfor %}
     </ul>

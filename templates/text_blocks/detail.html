@@ -21,6 +21,20 @@
   </div>
 </div>
 
+{% if search_highlights %}
+<section class="subcard search-highlights">
+  <h4>Suchtreffer</h4>
+  <ul class="list">
+    {% for match in search_highlights %}
+      <li>
+        <p class="muted">{{ match.label }}</p>
+        <p class="search-snippet">{{ match.content_html }}</p>
+      </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
 <form
   method="post"
   action="/p/{{ project.slug }}/blocks/{{ block.id }}"
