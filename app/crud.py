@@ -516,7 +516,7 @@ def search_text_blocks_for_project_snippets(
 def list_turns_for_project(
     db: Session, project_id: int, include_archived: bool = False
 ) -> list[dict]:
-    text_block_join = "LEFT JOIN text_blocks ON text_blocks.id = links.text_block_id"
+    text_block_join = "JOIN text_blocks ON text_blocks.id = links.text_block_id"
     if not include_archived:
         text_block_join += " AND text_blocks.archived = 0"
     rows = db.execute(
@@ -529,13 +529,21 @@ def list_turns_for_project(
                    turns.timestamp AS timestamp,
                    conversations.id AS conversation_id,
                    projects.id AS project_id,
-                   GROUP_CONCAT(text_blocks.tb_id) AS text_block_tb_ids,
-                   GROUP_CONCAT(text_blocks.tb_id || ':' || links.relation) AS text_block_links
+                   (
+                       SELECT GROUP_CONCAT(text_blocks.tb_id)
+                       FROM links
+                       {text_block_join}
+                       WHERE links.conversation_id = conversations.id
+                   ) AS text_block_tb_ids,
+                   (
+                       SELECT GROUP_CONCAT(text_blocks.tb_id || ':' || links.relation)
+                       FROM links
+                       {text_block_join}
+                       WHERE links.conversation_id = conversations.id
+                   ) AS text_block_links
             FROM turns
             JOIN conversations ON conversations.id = turns.conversation_id
             JOIN projects ON projects.id = conversations.project_id
-            LEFT JOIN links ON links.conversation_id = conversations.id
-            {text_block_join}
             WHERE projects.id = :project_id
             GROUP BY turns.id
             ORDER BY turns.timestamp DESC
