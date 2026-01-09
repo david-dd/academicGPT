@@ -307,6 +307,48 @@ def get_initial_system_turn(db: Session, conversation_id: int) -> Turn | None:
     return db.scalar(stmt)
 
 
+def get_latest_turn_by_role(db: Session, conversation_id: int, role: str) -> Turn | None:
+    stmt = (
+        select(Turn)
+        .where(Turn.conversation_id == conversation_id, Turn.role == role)
+        .order_by(Turn.timestamp.desc(), Turn.id.desc())
+        .limit(1)
+    )
+    return db.scalar(stmt)
+
+
+def upsert_system_turn(
+    db: Session, conversation: Conversation, content_text: str
+) -> Turn:
+    system_turn = get_initial_system_turn(db, conversation_id=conversation.id)
+    if system_turn:
+        system_turn.content_text = content_text
+        system_turn.timestamp = datetime.utcnow()
+        system_turn.model = "system"
+        db.add(system_turn)
+        db.commit()
+        db.execute(
+            text(
+                """
+                UPDATE turns_fts
+                SET content_text = :content_text
+                WHERE turn_id = :turn_id
+                """
+            ),
+            {"content_text": content_text, "turn_id": system_turn.id},
+        )
+        db.commit()
+        db.refresh(system_turn)
+        return system_turn
+    return create_turn(
+        db,
+        conversation=conversation,
+        role="system",
+        content_text=content_text,
+        model="system",
+    )
+
+
 def search_turns(db: Session, query: str) -> list[dict]:
     sql = (
         "SELECT turn_id, content_text, conversation_id, project_id "

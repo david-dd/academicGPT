@@ -252,6 +252,8 @@ button:hover {
   border-radius: 12px;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
+  display: grid;
+  gap: 0.5rem;
 }
 
 .chat-turn-system {
@@ -296,6 +298,7 @@ mark {
   gap: 0.75rem;
   align-items: center;
   margin-bottom: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .error {
@@ -350,6 +353,29 @@ mark {
   border-radius: 999px;
   background: #e2e8f0;
   font-size: 0.8rem;
+}
+
+.pill-muted {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.chat-config {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.message-form {
+  gap: 1rem;
+}
+
+.message-textarea {
+  min-height: 220px;
+  font-size: 1rem;
+  line-height: 1.5;
 }
 
 .pill-ok {

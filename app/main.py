@@ -123,6 +123,7 @@ def render_conversation_detail(
     highlight_query: str | None = None,
 ):
     turns = crud.list_turns_for_conversation(db, conversation_id=conversation.id)
+    system_turn = crud.get_initial_system_turn(db, conversation_id=conversation.id)
     highlight_terms = extract_query_terms(highlight_query)
     highlight_pattern = build_highlight_pattern(highlight_terms)
     rendered_turns = []
@@ -131,6 +132,7 @@ def render_conversation_detail(
             {
                 "id": turn.id,
                 "role": turn.role,
+                "model": turn.model,
                 "timestamp": turn.timestamp,
                 "content_html": highlight_text(turn.content_text, highlight_pattern),
                 "is_match": bool(
@@ -150,6 +152,7 @@ def render_conversation_detail(
             "relation_labels": RELATION_LABELS,
             "project_blocks": project.text_blocks,
             "highlight_query": highlight_query or "",
+            "system_instruction": system_turn.content_text if system_turn else "",
         },
     )
 
@@ -747,6 +750,12 @@ def create_conversation_message(
     client = get_openai_client(api_key)
     previous_response_id = crud.get_latest_response_id(db, conversation_id=conversation.id)
     system_turn = crud.get_initial_system_turn(db, conversation_id=conversation.id)
+    latest_assistant_turn = crud.get_latest_turn_by_role(
+        db, conversation_id=conversation.id, role="assistant"
+    )
+    if system_turn and latest_assistant_turn:
+        if system_turn.timestamp > latest_assistant_turn.timestamp:
+            previous_response_id = None
     input_messages = []
     if not previous_response_id and system_turn:
         input_messages.append({"role": "system", "content": system_turn.content_text})
@@ -818,6 +827,32 @@ def create_conversation_message(
         timestamp=datetime.utcnow(),
         response_id=response_id,
         metadata_json=metadata,
+    )
+    return RedirectResponse(
+        url=f"/p/{project.slug}/conversations/{conversation.id}", status_code=303
+    )
+
+
+@app.post("/p/{project_slug}/conversations/{conversation_id}/system")
+def update_conversation_system_instruction(
+    project_slug: str,
+    conversation_id: int,
+    request: Request,
+    system_instruction: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    project = get_project_by_slug_or_404(db, project_slug)
+    conversation = get_conversation_or_404(db, project, conversation_id)
+    if not system_instruction.strip():
+        return render_conversation_detail(
+            request,
+            project,
+            conversation,
+            db,
+            error="System instruction cannot be empty.",
+        )
+    crud.upsert_system_turn(
+        db, conversation=conversation, content_text=system_instruction.strip()
     )
     return RedirectResponse(
         url=f"/p/{project.slug}/conversations/{conversation.id}", status_code=303

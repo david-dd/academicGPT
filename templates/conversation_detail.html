@@ -74,6 +74,20 @@
   {% if error %}
     <p class="error">{{ error }}</p>
   {% endif %}
+  <form method="post" action="/p/{{ project.slug }}/conversations/{{ conversation.id }}/system" class="form-grid chat-config">
+    <label>
+      System-Instruktion
+      <textarea
+        name="system_instruction"
+        rows="5"
+        placeholder="Beschreibe hier den gewünschten Stil oder die Rolle des Modells."
+      >{{ system_instruction }}</textarea>
+    </label>
+    <p class="muted">
+      Diese Instruktion steuert die Antwortweise und wird bei Bedarf für die nächste Nachricht verwendet.
+    </p>
+    <button type="submit">System-Kontext speichern</button>
+  </form>
   {% if turns %}
     <ul class="chat-thread">
       {% for turn in turns %}
@@ -83,6 +97,7 @@
         >
           <div class="chat-meta">
             <span class="pill">{{ turn.role }}</span>
+            <span class="pill pill-muted">Model: {{ turn.model }}</span>
             <span class="muted">{{ turn.timestamp.strftime('%Y-%m-%d %H:%M') }}</span>
           </div>
           <p>{{ turn.content_html }}</p>
@@ -96,10 +111,15 @@
 
 <section class="card">
   <h3>Send message</h3>
-  <form method="post" action="/p/{{ project.slug }}/conversations/{{ conversation.id }}/messages" class="form-grid" data-message-form>
+  <form
+    method="post"
+    action="/p/{{ project.slug }}/conversations/{{ conversation.id }}/messages"
+    class="form-grid message-form"
+    data-message-form
+  >
     <label>
       Message
-      <textarea name="message" rows="4" required></textarea>
+      <textarea name="message" rows="8" class="message-textarea" required></textarea>
     </label>
     <button type="submit">Send</button>
   </form>
