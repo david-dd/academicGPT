@@ -1,13 +1,37 @@
 {% extends "base.html" %}
 {% block content %}
 <section class="card conversation-meta">
-  <div class="split conversation-header">
-      <h3>{{ conversation.title }}</h3>
-    <div class="row-actions">
-      <a href="/p/{{ project.slug }}/conversations">All conversations</a>
+
+
+  {% if error %}
+    <p class="error">{{ error }}</p>
+  {% endif %}
+  {% if model_list_error %}
+    <p class="error">{{ model_list_error }}</p>
+  {% endif %}
+  {% if needs_system_instruction_sync and project_system_instruction %}
+    <div class="alert alert-warning">
+      <strong>Projektweite System-Instruktion hat sich geändert.</strong>
+      <p class="muted">
+        Entscheide, ob der Chat auf den neuen Projektstandard aktualisiert werden soll oder die aktuelle
+        Konfiguration bestehen bleibt.
+      </p>
+      <div class="form-inline">
+        <form method="post" action="/p/{{ project.slug }}/conversations/{{ conversation.id }}/system/sync">
+          <input type="hidden" name="decision" value="update">
+          <button type="submit">Aktualisieren</button>
+        </form>
+        <form method="post" action="/p/{{ project.slug }}/conversations/{{ conversation.id }}/system/sync">
+          <input type="hidden" name="decision" value="keep">
+          <button type="submit" class="button-secondary">Beibehalten</button>
+        </form>
+      </div>
     </div>
-  </div>
-  <details class="context-details">
+  {% endif %}
+  <details class="chat-config-details">
+    <summary>Einstellungen</summary>
+
+      <details class="context-details">
     <summary>
       <span>Kontext &amp; Metadaten</span>
       <span class="muted">
@@ -110,33 +134,6 @@
     {% endif %}
   </details>
 
-  {% if error %}
-    <p class="error">{{ error }}</p>
-  {% endif %}
-  {% if model_list_error %}
-    <p class="error">{{ model_list_error }}</p>
-  {% endif %}
-  {% if needs_system_instruction_sync and project_system_instruction %}
-    <div class="alert alert-warning">
-      <strong>Projektweite System-Instruktion hat sich geändert.</strong>
-      <p class="muted">
-        Entscheide, ob der Chat auf den neuen Projektstandard aktualisiert werden soll oder die aktuelle
-        Konfiguration bestehen bleibt.
-      </p>
-      <div class="form-inline">
-        <form method="post" action="/p/{{ project.slug }}/conversations/{{ conversation.id }}/system/sync">
-          <input type="hidden" name="decision" value="update">
-          <button type="submit">Aktualisieren</button>
-        </form>
-        <form method="post" action="/p/{{ project.slug }}/conversations/{{ conversation.id }}/system/sync">
-          <input type="hidden" name="decision" value="keep">
-          <button type="submit" class="button-secondary">Beibehalten</button>
-        </form>
-      </div>
-    </div>
-  {% endif %}
-  <details class="chat-config-details">
-    <summary>System-Instruktion</summary>
     <form method="post" action="/p/{{ project.slug }}/conversations/{{ conversation.id }}/system" class="form-grid chat-config">
       <label>
         System-Instruktion
