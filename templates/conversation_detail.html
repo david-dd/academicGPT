@@ -2,10 +2,7 @@
 {% block content %}
 <section class="card conversation-meta">
   <div class="split conversation-header">
-    <div>
-      <h2>{{ conversation.title }}</h2>
-      <p class="muted">Source: {{ conversation.source }}</p>
-    </div>
+      <h3>{{ conversation.title }}</h3>
     <div class="row-actions">
       <a href="/p/{{ project.slug }}/conversations">All conversations</a>
     </div>
@@ -57,9 +54,7 @@
       <button type="submit">Metadaten speichern</button>
     </form>
   </details>
-</section>
 
-<section class="card">
   <details class="section-details">
     <summary>
       <span>Verknüpfte Textbausteine</span>
@@ -114,13 +109,7 @@
       <p class="muted">Noch keine Textbausteine verknüpft.</p>
     {% endif %}
   </details>
-</section>
 
-<section class="card">
-  <div class="split">
-    <h3>Chat</h3>
-    <span class="muted">Nachricht senden</span>
-  </div>
   {% if error %}
     <p class="error">{{ error }}</p>
   {% endif %}
