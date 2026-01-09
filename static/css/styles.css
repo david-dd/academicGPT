@@ -140,19 +140,19 @@ input:focus,
 textarea:focus,
 select:focus {
   outline: none;
-  border-color: #2563eb;
+  border-color: #369B00;
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
 }
 
 button {
-  background: #2563eb;
+  background: #369B00;
   color: #fff;
   border: none;
   cursor: pointer;
 }
 
 button:hover {
-  background: #1d4ed8;
+  background: #1F6600;
 }
 
 .button-secondary {
@@ -179,7 +179,7 @@ button:hover {
 }
 
 .button-link:hover {
-  border-color: #2563eb;
+  border-color: #369B00;
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
 
@@ -238,7 +238,7 @@ button:hover {
 }
 
 .tab-item.is-active {
-  border-color: #2563eb;
+  border-color: #369B00;
   background: #eff6ff;
 }
 
@@ -291,7 +291,7 @@ button:hover {
 }
 
 .actions a {
-  color: #2563eb;
+  color: #369B00;
 }
 
 .row-actions {
@@ -302,7 +302,7 @@ button:hover {
 
 .title-link {
   font-weight: 600;
-  color: #2563eb;
+  color: #369B00;
   text-decoration: none;
 }
 
@@ -311,7 +311,7 @@ button:hover {
 }
 
 .conversation {
-  border-left: 3px solid #2563eb;
+  border-left: 3px solid #369B00;
   padding-left: 1rem;
   margin-top: 1rem;
 }
@@ -530,7 +530,7 @@ mark {
 .progress-bar {
   height: 100%;
   width: 35%;
-  background: linear-gradient(90deg, #2563eb 0%, #60a5fa 50%, #2563eb 100%);
+  background: linear-gradient(90deg, #369B00 0%, #60a5fa 50%, #369B00 100%);
   animation: progressMove 1.2s ease-in-out infinite;
 }
 
@@ -603,7 +603,7 @@ mark {
 }
 
 .status-message.status-pending {
-  color: #1d4ed8;
+  color: #1F6600;
 }
 
 .status-message.status-error {

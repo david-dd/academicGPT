@@ -518,7 +518,7 @@ def list_turns_for_project(
 ) -> list[dict]:
     text_block_join = "JOIN text_blocks ON text_blocks.id = links.text_block_id"
     if not include_archived:
-        text_block_join += " AND text_blocks.archived = 0"
+        text_block_join += " AND (text_blocks.archived = 0 OR text_blocks.archived IS NULL)"
     rows = db.execute(
         text(
             f"""
