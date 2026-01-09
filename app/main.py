@@ -1009,13 +1009,13 @@ def export_project(project_slug: str, db: Session = Depends(get_db)):
     def generate():
         for row in rows:
             payload = dict(row)
-            text_block_ids = payload.get("text_block_ids")
+            text_block_ids = payload.get("text_block_tb_ids")
             if text_block_ids:
-                payload["text_block_ids"] = [
-                    int(block_id) for block_id in text_block_ids.split(",") if block_id
+                payload["text_block_tb_ids"] = [
+                    block_id for block_id in text_block_ids.split(",") if block_id
                 ]
             else:
-                payload["text_block_ids"] = []
+                payload["text_block_tb_ids"] = []
             yield json.dumps(payload, ensure_ascii=False) + "\n"
 
     headers = {"Content-Disposition": f"attachment; filename=project_{project.id}.jsonl"}

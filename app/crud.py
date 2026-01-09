@@ -493,11 +493,12 @@ def list_turns_for_project(db: Session, project_id: int) -> list[dict]:
                    turns.timestamp AS timestamp,
                    conversations.id AS conversation_id,
                    projects.id AS project_id,
-                   GROUP_CONCAT(links.text_block_id) AS text_block_ids
+                   GROUP_CONCAT(text_blocks.tb_id) AS text_block_tb_ids
             FROM turns
             JOIN conversations ON conversations.id = turns.conversation_id
             JOIN projects ON projects.id = conversations.project_id
             LEFT JOIN links ON links.conversation_id = conversations.id
+            LEFT JOIN text_blocks ON text_blocks.id = links.text_block_id
             WHERE projects.id = :project_id
             GROUP BY turns.id
             ORDER BY turns.timestamp DESC
