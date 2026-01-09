@@ -72,19 +72,19 @@ body {
 .data-table td {
   text-align: left;
   padding: 0.75rem;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid #c1c1c1;
   vertical-align: top;
 }
 
 .data-table th {
-  background: #f8fafc;
+  background: #f5f5f5;
   color: #475569;
   font-weight: 600;
 }
 
 .list li {
   padding: 0.75rem 0;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid #c1c1c1;
 }
 
 .list-item {
@@ -156,7 +156,7 @@ button:hover {
 }
 
 .button-secondary {
-  background: #e2e8f0;
+  background: #c1c1c1;
   color: #0f172a;
 }
 
@@ -232,14 +232,14 @@ button:hover {
 }
 
 .tab-item {
-  border: 1px solid #e2e8f0;
+  border: 1px solid #c1c1c1;
   border-radius: 10px;
-  background: #f8fafc;
+  background: #f5f5f5;
 }
 
 .tab-item.is-active {
   border-color: #369B00;
-  background: #eff6ff;
+  background: #f9fff6;
 }
 
 .tab-link {
@@ -271,13 +271,13 @@ button:hover {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 1rem;
-  background: #f8fafc;
+  background: #f5f5f5;
   padding: 1rem;
   border-radius: 12px;
 }
 
 .card-inline {
-  background: #f8fafc;
+  background: #f5f5f5;
   padding: 1rem;
   border-radius: 12px;
   display: grid;
@@ -356,43 +356,37 @@ button:hover {
   bottom: 0;
   background: #ffffff;
   padding-top: 0.75rem;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid #c1c1c1;
 }
 
 .chat-turn {
   padding: 1rem;
   border-radius: 12px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #1f6600;
+  background: #f3f3f3;
   display: grid;
   gap: 0.5rem;
   max-width: 72%;
 }
 
 .chat-turn-system {
-  background: #fff7ed;
-  border-color: #fed7aa;
   align-self: center;
   max-width: 80%;
 }
 
 .chat-turn-user {
-  background: #eff6ff;
-  border-color: #bfdbfe;
+  background: #f9f9f9;
+  border-color: #333333;
   align-self: flex-end;
   border-bottom-right-radius: 4px;
 }
 
 .chat-turn-assistant {
-  background: #ecfdf3;
-  border-color: #bbf7d0;
   align-self: flex-start;
   border-bottom-left-radius: 4px;
 }
 
 .chat-turn-event {
-  background: #f1f5f9;
-  border-color: #cbd5f5;
   align-self: center;
   max-width: 80%;
 }
@@ -409,7 +403,7 @@ button:hover {
 
 .search-highlights .list li {
   padding: 0.5rem 0;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid #c1c1c1;
 }
 
 mark {
@@ -456,7 +450,7 @@ mark {
 }
 
 .stat {
-  background: #f8fafc;
+  background: #f5f5f5;
   padding: 0.75rem;
   border-radius: 10px;
 }
@@ -477,21 +471,21 @@ mark {
   display: inline-flex;
   padding: 0.2rem 0.65rem;
   border-radius: 999px;
-  background: #e2e8f0;
+  background: #c1c1c1;
   font-size: 0.8rem;
 }
 
 .pill-muted {
-  background: #f1f5f9;
-  color: #475569;
+  background: #ededed;
+  color: #333333;
 }
 
 .chat-config {
   margin-bottom: 1.5rem;
   padding: 1rem;
   border-radius: 12px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: #f5f5f5;
+  border: 1px solid #c1c1c1;
 }
 
 .context-panel {
@@ -499,10 +493,10 @@ mark {
   display: grid;
   gap: 1.5rem;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  background: #f8fafc;
+  background: #f5f5f5;
   border-radius: 14px;
   padding: 1rem;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #c1c1c1;
 }
 
 .context-details,
@@ -575,7 +569,7 @@ mark {
   border: 1px solid #d8e0ea;
   border-radius: 14px;
   padding: 0.75rem;
-  background: #f8fafc;
+  background: #f5f5f5;
   display: grid;
   gap: 0.75rem;
 }
@@ -633,7 +627,7 @@ mark {
   height: 6px;
   border-radius: 999px;
   overflow: hidden;
-  background: #e2e8f0;
+  background: #c1c1c1;
 }
 
 .progress-bar {
@@ -656,8 +650,8 @@ mark {
 }
 
 .pill-ok {
-  background: #dcfce7;
-  color: #166534;
+  background: #1f6600;
+  color: #ffffff;
 }
 
 .pill-warn {
@@ -671,7 +665,7 @@ mark {
 }
 
 .subcard {
-  background: #f8fafc;
+  background: #f5f5f5;
   border-radius: 12px;
   padding: 1rem;
 }
@@ -695,7 +689,7 @@ mark {
 
 .alert-success {
   background: #ecfdf3;
-  color: #166534;
+  color: #ffffff;
   border: 1px solid #bbf7d0;
 }
 

@@ -2,6 +2,62 @@
   <div class="split">
     <h4>Verknüpfte Konversationen</h4>
   </div>
+  {% if links %}
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>CrateDate</th>
+            <th>ID</th>
+            <th>Beschreibung</th>
+            <th>Note</th>
+            <th>Turns (Summe)</th>
+            <th>Chat öffnen</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for link in links %}
+            <tr>
+              <td>{{ link.conversation.created_at.strftime("%d.%m.%Y %H:%M") }}</td>
+              <td>{{ link.conversation.id }}</td>
+              <td>
+                <div>
+                  <strong>{{ link.conversation.title }}</strong>
+                  <p class="muted">Relation: {{ relation_labels[link.relation] }}</p>
+                </div>
+                <form
+                  method="post"
+                  action="/p/{{ project.slug }}/blocks/{{ block.id }}/links/{{ link.id }}"
+                  class="form-inline"
+                  hx-post="/p/{{ project.slug }}/blocks/{{ block.id }}/links/{{ link.id }}"
+                  hx-target="#block-links"
+                  hx-swap="innerHTML"
+                >
+                  <select name="relation">
+                    {% for relation in relation_types %}
+                      <option value="{{ relation }}" {% if link.relation == relation %}selected{% endif %}>
+                        {{ relation_labels[relation] }}
+                      </option>
+                    {% endfor %}
+                  </select>
+                  <button type="submit">Aktualisieren</button>
+                </form>
+              </td>
+              <td>{{ link.conversation.notes or "Noch keine Notiz." }}</td>
+              <td>{{ turn_counts.get(link.conversation.id, 0) }}</td>
+              <td><a href="/p/{{ project.slug }}/conversations/{{ link.conversation.id }}">Öffnen</a></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="muted">Keine verknüpften Konversationen.</p>
+  {% endif %}
+</section>
+
+<section class="card-inline">
+  <h4>Filter</h4>
   <form
     method="get"
     action="/p/{{ project.slug }}/blocks/{{ block.id }}/links"
@@ -29,94 +85,46 @@
   </form>
 </section>
 
-<section class="card-inline">
-  <h4>Konversation hinzufügen</h4>
-  <form
-    method="post"
-    action="/p/{{ project.slug }}/blocks/{{ block.id }}/links"
-    class="form-grid"
-    hx-post="/p/{{ project.slug }}/blocks/{{ block.id }}/links"
-    hx-target="#block-links"
-    hx-swap="innerHTML"
-  >
-    <label>
-      Bestehende Konversation
-      <select name="conversation_id">
-        <option value="">Neue Konversation erstellen</option>
-        {% for convo in project_conversations %}
-          <option value="{{ convo.id }}">{{ convo.title }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <label>
-      Neuer Titel (nur bei neuer Konversation)
-      <input type="text" name="new_title">
-    </label>
-    <label>
-      Notiz (nur bei neuer Konversation)
-      <textarea name="new_notes" rows="3"></textarea>
-    </label>
-    <label>
-      Relationstyp
-      <select name="relation" required>
-        {% for relation in relation_types %}
-          <option value="{{ relation }}">{{ relation_labels[relation] }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <button type="submit">Konversation hinzufügen</button>
-  </form>
-</section>
-
-{% if links %}
-  <div class="table-wrap">
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th>CrateDate</th>
-          <th>ID</th>
-          <th>Beschreibung</th>
-          <th>Note</th>
-          <th>Turns (Summe)</th>
-          <th>Chat öffnen</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for link in links %}
-          <tr>
-            <td>{{ link.conversation.created_at.strftime("%d.%m.%Y %H:%M") }}</td>
-            <td>{{ link.conversation.id }}</td>
-            <td>
-              <div>
-                <strong>{{ link.conversation.title }}</strong>
-                <p class="muted">Relation: {{ relation_labels[link.relation] }}</p>
-              </div>
-              <form
-                method="post"
-                action="/p/{{ project.slug }}/blocks/{{ block.id }}/links/{{ link.id }}"
-                class="form-inline"
-                hx-post="/p/{{ project.slug }}/blocks/{{ block.id }}/links/{{ link.id }}"
-                hx-target="#block-links"
-                hx-swap="innerHTML"
-              >
-                <select name="relation">
-                  {% for relation in relation_types %}
-                    <option value="{{ relation }}" {% if link.relation == relation %}selected{% endif %}>
-                      {{ relation_labels[relation] }}
-                    </option>
-                  {% endfor %}
-                </select>
-                <button type="submit">Aktualisieren</button>
-              </form>
-            </td>
-            <td>{{ link.conversation.notes or "Noch keine Notiz." }}</td>
-            <td>{{ turn_counts.get(link.conversation.id, 0) }}</td>
-            <td><a href="/p/{{ project.slug }}/conversations/{{ link.conversation.id }}">Öffnen</a></td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-{% else %}
-  <p class="muted">Keine verknüpften Konversationen.</p>
-{% endif %}
+<details class="section-details">
+  <summary>
+    <span>Konversation hinzufügen</span>
+    <span aria-hidden="true">⚙️</span>
+  </summary>
+  <section class="card-inline">
+    <form
+      method="post"
+      action="/p/{{ project.slug }}/blocks/{{ block.id }}/links"
+      class="form-grid"
+      hx-post="/p/{{ project.slug }}/blocks/{{ block.id }}/links"
+      hx-target="#block-links"
+      hx-swap="innerHTML"
+    >
+      <label>
+        Bestehende Konversation
+        <select name="conversation_id">
+          <option value="">Neue Konversation erstellen</option>
+          {% for convo in project_conversations %}
+            <option value="{{ convo.id }}">{{ convo.title }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        Neuer Titel (nur bei neuer Konversation)
+        <input type="text" name="new_title">
+      </label>
+      <label>
+        Notiz (nur bei neuer Konversation)
+        <textarea name="new_notes" rows="3"></textarea>
+      </label>
+      <label>
+        Relationstyp
+        <select name="relation" required>
+          {% for relation in relation_types %}
+            <option value="{{ relation }}">{{ relation_labels[relation] }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <button type="submit">Konversation hinzufügen</button>
+    </form>
+  </section>
+</details>
